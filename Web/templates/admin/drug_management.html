@@ -1,0 +1,282 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Quản lý thuốc - Admin{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 100px auto; padding: 20px;">
+    
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); color: white; padding: 25px; border-radius: 10px; margin-bottom: 25px; text-align: center;">
+        <h1><i class="fas fa-pills"></i> Quản lý Database Thuốc</h1>
+        <p>Thêm, sửa, xóa thông tin thuốc trong hệ thống</p>
+    </div>
+
+    <!-- Flash Messages -->
+    <div class="alerts">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}" 
+                         data-alert-type="{{ category }}"
+                         data-message="{{ message|e }}">
+                        <i class="fas fa-{{ 'check-circle' if category == 'success' else 'exclamation-triangle' }}"></i>
+                        <span>{{ message }}</span>
+                        <button type="button" data-dismiss="alert">&times;</button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Actions -->
+    <div style="display: flex; justify-content: space-between; margin-bottom: 25px; gap: 15px; flex-wrap: wrap;">
+        
+        <!-- Search -->
+        <div style="display: flex; gap: 10px; flex: 1; max-width: 400px;">
+            <input type="text" 
+                   id="searchInput" 
+                   placeholder="Tìm kiếm thuốc..." 
+                   value="{{ search }}"
+                   style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 6px;"
+                   onkeypress="if(event.key==='Enter') searchDrugs()">
+            <button onclick="searchDrugs()" style="padding: 10px 15px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                <i class="fas fa-search"></i> Tìm
+            </button>
+        </div>
+        
+        <!-- Add Drug -->
+        <a href="{{ url_for('add_drug') }}" style="padding: 10px 15px; background: #27ae60; color: white; text-decoration: none; border-radius: 6px;">
+            <i class="fas fa-plus"></i> Thêm thuốc
+        </a>
+    </div>
+
+    <!-- Drugs Table -->
+    <div style="background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+        <table style="width: 100%; border-collapse: collapse;">
+            <colgroup>
+                <col style="width: 5%;">  
+                <col style="width: 40%;"> 
+                <col style="width: 25%;"> 
+                <col style="width: 15%;">
+                <col style="width: 15%;"> 
+            </colgroup>
+            <thead>
+                <tr style="background: #f8f9fa;">
+                    <th style="padding: 15px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6;">ID</th>
+                    <th style="padding: 15px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6;">Tên thuốc</th>
+                    <th style="padding: 15px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6;">Phân loại</th>
+                    <th style="padding: 15px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6;">Nguồn</th>
+                    <th style="padding: 15px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6;">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if drugs %}
+                {% for drug in drugs %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 10px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="background: #3498db; color: white; padding: 4px 8px; border-radius: 50%; font-size: 12px; min-width: 24px; text-align: center; font-weight: bold;">
+                                {{ loop.index }}
+                            </span>
+                        </div>
+                    </td>
+                    <td style="padding: 10px;">
+                        <strong>{{ drug.drug_name }}</strong>
+                        {% if drug.indication %}
+                            <br><small style="color: #666;">{{ drug.indication[:60] }}{% if drug.indication|length > 60 %}...{% endif %}</small>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 10px;">{{ drug.drug_class or 'Chưa phân loại' }}</td>
+                    
+                    <td style="padding: 10px;">
+                        {% if drug.source == 'dataset' %}
+                            <span style="background: #3498db; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">
+                                <i class="fas fa-database"></i> Dataset
+                            </span>
+                        {% else %}
+                            <span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">
+                                <i class="fas fa-user"></i> Thủ công
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 10px;">
+                        <div style="display: flex; gap: 5px;">
+                            <!-- Xem chi tiết -->
+                            <button onclick="showDrugDetailSafe(this)" 
+                                    data-drug-index="{{ drug.id }}" 
+                                    data-drug-name="{{ drug.drug_name }}"
+                                    style="padding: 4px 8px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;"
+                                    title="Xem chi tiết">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            
+                            <!-- Chỉ cho phép xóa thuốc thêm thủ công -->
+                            {% if drug.source == 'manual' %}
+                            <form method="POST" 
+                                  action="{{ url_for('delete_drug_route', drug_id=drug.id) }}" 
+                                  style="display: inline;" 
+                                  data-drug-name="{{ drug.drug_name|e }}"
+                                  onsubmit="return confirmDelete(this)">
+                                <button type="submit" 
+                                        style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;"
+                                        title="Xóa">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                            {% else %}
+                            <span style="color: #6c757d; font-size: 11px;" title="Không thể xóa thuốc từ dataset">
+                                <i class="fas fa-lock"></i>
+                            </span>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 40px; color: #6c757d;">
+                        <i class="fas fa-pills fa-3x" style="margin-bottom: 15px; opacity: 0.3;"></i>
+                        <p>Không tìm thấy thuốc nào</p>
+                        <a href="{{ url_for('add_drug') }}" style="padding: 10px 20px; background: #27ae60; color: white; text-decoration: none; border-radius: 6px;">
+                            <i class="fas fa-plus"></i> Thêm thuốc đầu tiên
+                        </a>
+                    </td>
+                </tr>
+            {% endif %}
+            </tbody>
+        </table>
+        
+    </div>
+
+     <!-- Stats -->
+     <div style="text-align: center; margin-top: 25px; color: #6c757d;">
+        <p>
+            <strong>Hiển thị:</strong> {{ drugs|length }} trên {{ pagination.total }} thuốc
+            (Trang {{ pagination.page }}/{{ pagination.total_pages }})
+            {% if search %}
+                <span style="color: #3498db;">- Tìm kiếm: "{{ search }}"</span>
+            {% endif %}
+        </p>
+    </div>
+
+
+    <!-- Pagination -->
+    {% if pagination.total_pages > 1 %}
+    <div style="display: flex; justify-content: center; align-items: center; gap: 5px; margin: 20px 0; flex-wrap: wrap;">
+        <!-- Nút Trước -->
+        {% if pagination.has_prev %}
+            <a href="{{ url_for('admin_drugs', page=pagination.prev_num, search=search) }}"
+                style="padding: 8px 12px; text-decoration: none; border-radius: 6px; color: #3498db; border: 1px solid #ddd;">
+                <i class="fas fa-chevron-left"></i> Trước
+            </a>
+        {% endif %}
+        
+        <!-- Số trang -->
+        {% if pagination.total_pages <= 7 %}
+            {% for page_num in range(1, pagination.total_pages + 1) %}
+                {% if page_num == pagination.page %}
+                    <span style="padding: 8px 12px; background: #3498db; color: white; border-radius: 6px; font-weight: bold;">{{ page_num }}</span>
+                {% else %}
+                    <a href="{{ url_for('admin_drugs', page=page_num, search=search) }}"
+                        style="padding: 8px 12px; text-decoration: none; border-radius: 6px; color: #3498db; border: 1px solid #ddd;">{{ page_num }}</a>
+                {% endif %}
+            {% endfor %}
+        {% else %}
+            <!-- Logic cho nhiều trang -->
+            {% if pagination.page <= 4 %}
+                {% for page_num in range(1, 6) %}
+                    {% if page_num == pagination.page %}
+                        <span style="padding: 8px 12px; background: #3498db; color: white; border-radius: 6px; font-weight: bold;">{{ page_num }}</span>
+                    {% else %}
+                        <a href="{{ url_for('admin_drugs', page=page_num, search=search) }}"
+                            style="padding: 8px 12px; text-decoration: none; border-radius: 6px; color: #3498db; border: 1px solid #ddd;">{{ page_num }}</a>
+                    {% endif %}
+                {% endfor %}
+                <span style="padding: 8px; color: #6c757d;">...</span>
+                <a href="{{ url_for('admin_drugs', page=pagination.total_pages, search=search) }}"
+                    style="padding: 8px 12px; text-decoration: none; border-radius: 6px; color: #3498db; border: 1px solid #ddd;">{{ pagination.total_pages }}</a>
+            {% elif pagination.page >= pagination.total_pages - 3 %}
+                <a href="{{ url_for('admin_drugs', page=1, search=search) }}"
+                    style="padding: 8px 12px; text-decoration: none; border-radius: 6px; color: #3498db; border: 1px solid #ddd;">1</a>
+                <span style="padding: 8px; color: #6c757d;">...</span>
+                {% for page_num in range(pagination.total_pages - 4, pagination.total_pages + 1) %}
+                    {% if page_num == pagination.page %}
+                        <span style="padding: 8px 12px; background: #3498db; color: white; border-radius: 6px; font-weight: bold;">{{ page_num }}</span>
+                    {% else %}
+                        <a href="{{ url_for('admin_drugs', page=page_num, search=search) }}"
+                            style="padding: 8px 12px; text-decoration: none; border-radius: 6px; color: #3498db; border: 1px solid #ddd;">{{ page_num }}</a>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <a href="{{ url_for('admin_drugs', page=1, search=search) }}"
+                    style="padding: 8px 12px; text-decoration: none; border-radius: 6px; color: #3498db; border: 1px solid #ddd;">1</a>
+                <span style="padding: 8px; color: #6c757d;">...</span>
+                {% for page_num in range(pagination.page - 1, pagination.page + 2) %}
+                    {% if page_num == pagination.page %}
+                        <span style="padding: 8px 12px; background: #3498db; color: white; border-radius: 6px; font-weight: bold;">{{ page_num }}</span>
+                    {% else %}
+                        <a href="{{ url_for('admin_drugs', page=page_num, search=search) }}"
+                            style="padding: 8px 12px; text-decoration: none; border-radius: 6px; color: #3498db; border: 1px solid #ddd;">{{ page_num }}</a>
+                    {% endif %}
+                {% endfor %}
+                <span style="padding: 8px; color: #6c757d;">...</span>
+                <a href="{{ url_for('admin_drugs', page=pagination.total_pages, search=search) }}"
+                    style="padding: 8px 12px; text-decoration: none; border-radius: 6px; color: #3498db; border: 1px solid #ddd;">{{ pagination.total_pages }}</a>
+            {% endif %}
+        {% endif %}
+        
+        <!-- Nút Sau -->
+        {% if pagination.has_next %}
+            <a href="{{ url_for('admin_drugs', page=pagination.next_num, search=search) }}"
+                style="padding: 8px 12px; text-decoration: none; border-radius: 6px; color: #3498db; border: 1px solid #ddd;">
+                Sau <i class="fas fa-chevron-right"></i>
+            </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Back to Admin -->
+    <div style="text-align: center; margin-top: 25px;">
+        <a href="{{ url_for('admin_dashboard') }}" style="padding: 10px 20px; background: #6c757d; color: white; text-decoration: none; border-radius: 6px;">
+            <i class="fas fa-arrow-left"></i> Về Admin Dashboard
+        </a>
+    </div>
+</div>
+
+<script>
+    function searchDrugs() {
+        const searchTerm = document.getElementById('searchInput').value;
+        const url = new URL(window.location);
+        
+        if (searchTerm.trim()) {
+            url.searchParams.set('search', searchTerm);
+        } else {
+            url.searchParams.delete('search');
+        }
+        
+        window.location.href = url.toString();
+    }
+    
+    function confirmDelete(form) {
+        const drugName = form.getAttribute('data-drug-name');
+        return confirm(`Bạn có chắc muốn xóa thuốc "${drugName}"?\n\nHành động này không thể hoàn tác!`);
+    }
+
+    document.querySelectorAll('[data-dismiss="alert"]').forEach(btn => {
+    btn.onclick = () => btn.closest('.alert').remove(); 
+    });
+
+    function showDrugDetailSafe(button) {
+        const drugIndex = button.getAttribute('data-drug-index');
+        const drugName = button.getAttribute('data-drug-name');
+        
+        if (typeof window.showDrugDetail === 'function') {
+            window.showDrugDetail(parseInt(drugIndex), drugName);
+        } else {
+            alert('Đang tải thông tin chi tiết...');
+            window.location.href = `/drug/${drugIndex}`;
+        }
+    }
+    
+</script>
+{% endblock %}

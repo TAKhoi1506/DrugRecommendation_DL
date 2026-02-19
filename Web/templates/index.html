@@ -1,0 +1,191 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Hệ thống Hỗ trợ Quyết định Lâm sàng - Gợi ý Thuốc Thông minh{% endblock %}
+
+{% block meta_description %}Hệ thống AI gợi ý thuốc dựa trên triệu chứng bệnh nhân. Hỗ trợ bác sĩ đưa ra quyết định điều trị chính xác, an toàn và hiệu quả.{% endblock %}
+
+{% block meta_keywords %}hệ thống hỗ trợ quyết định, gợi ý thuốc, AI y tế, machine learning, bác sĩ, điều trị, triệu chứng, thuốc{% endblock %}
+
+{% block content %}
+
+
+<!-- Main Container -->
+<div class="container">
+    <!-- Enhanced Header Section -->
+    <div class="header">
+        <div class="header-content">
+            <div class="header-main">
+                <div class="header-icon">
+                    <i class="fas fa-stethoscope"></i>
+                </div>
+                <div class="header-text">
+                    <h1>Hệ thống hỗ trợ quyết định lâm sàng</h1>
+                    <p class="header-subtitle">Gợi ý thuốc thông minh dựa trên triệu chứng - Hỗ trợ bác sĩ đưa ra quyết định chính xác</p>
+                    <div class="header-stats">
+                        <div class="stat-item">
+                            <i class="fas fa-pills"></i>
+                            <span>5,000+ Thuốc</span>
+                        </div>
+                        <div class="stat-item">
+                            <i class="fas fa-user-md"></i>
+                            <span>1,000+ Bác sĩ tin dùng</span>
+                        </div>
+                        <div class="stat-item">
+                            <i class="fas fa-chart-line"></i>
+                            <span>62% Độ chính xác</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="header-features">
+                <div class="feature-item">
+                    <i class="fas fa-brain"></i>
+                    <h3>AI Thông minh</h3>
+                    <p>Sử dụng Machine Learning để phân tích triệu chứng và đưa ra gợi ý thuốc chính xác</p>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-shield-alt"></i>
+                    <h3>An toàn</h3>
+                    <p>Kiểm tra chống chỉ định, tương tác thuốc và cảnh báo an toàn</p>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-clock"></i>
+                    <h3>Nhanh chóng</h3>
+                    <p>Kết quả phân tích và gợi ý trong vài giây</p>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-database"></i>
+                    <h3>Cơ sở dữ liệu lớn</h3>
+                    <p>Thông tin đầy đủ về hàng ngàn loại thuốc được cập nhật liên tục</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Search Section -->
+    <div class="search-section">
+        <div class="search-title">
+            <h2><i class="fas fa-search-plus"></i> Tìm kiếm thuốc theo triệu chứng</h2>
+            <p>Nhập các triệu chứng của bệnh nhân để nhận được gợi ý thuốc phù hợp từ hệ thống AI</p>
+        </div>
+        
+        <div class="search-box">
+            <input type="text" 
+                   id="symptomsInput" 
+                   placeholder="Nhập triệu chứng bệnh nhân (VD: đau đầu, sốt cao, ho khan, đau bụng...)"
+                   autocomplete="off"
+                   aria-label="Nhập triệu chứng bệnh nhân">
+            <button id="searchBtn" aria-label="Tìm kiếm thuốc">
+                <i class="fas fa-search"></i> 
+                <span>Phân tích</span>
+            </button>
+        </div>
+        
+        <div class="examples">
+            <h3><i class="fas fa-lightbulb"></i> Triệu chứng phổ biến:</h3>
+            <div class="example-tags">
+                <button class="example-btn" onclick="setExample('đau đầu và sốt')" type="button">
+                    <i class="fas fa-thermometer-half"></i> đau đầu và sốt
+                </button>
+                <button class="example-btn" onclick="setExample('ho khan kéo dài')" type="button">
+                    <i class="fas fa-lungs"></i> ho khan kéo dài
+                </button>
+                <button class="example-btn" onclick="setExample('đau bụng tiêu chảy')" type="button">
+                    <i class="fas fa-stomach"></i> đau bụng tiêu chảy
+                </button>
+                <button class="example-btn" onclick="setExample('cảm lạnh nghẹt mũi')" type="button">
+                    <i class="fas fa-head-side-cough"></i> cảm lạnh nghẹt mũi
+                </button>
+                <button class="example-btn" onclick="setExample('đau họng khàn tiếng')" type="button">
+                    <i class="fas fa-microphone-slash"></i> đau họng khàn tiếng
+                </button>
+                <button class="example-btn" onclick="setExample('dị ứng ngứa da')" type="button">
+                    <i class="fas fa-allergies"></i> dị ứng ngứa da
+                </button>
+                <button class="example-btn" onclick="setExample('viêm nhiễm kháng sinh')" type="button">
+                    <i class="fas fa-virus"></i> viêm nhiễm
+                </button>
+                <button class="example-btn" onclick="setExample('đau khớp viêm khớp')" type="button">
+                    <i class="fas fa-bone"></i> đau khớp
+                </button>
+            </div>
+        </div>
+        
+        <!-- Loading State -->
+        <div class="loading" id="loading">
+            <i class="fas fa-spinner fa-spin fa-2x"></i>
+            <p>Đang phân tích triệu chứng và tìm kiếm thuốc phù hợp...</p>
+            <div class="loading-steps">
+                <small>Phân tích ngôn ngữ tự nhiên</small><br>
+                <small>Áp dụng machine learning</small><br>
+                <small>Tìm kiếm cơ sở dữ liệu thuốc</small><br>
+                <small>Kiểm tra an toàn và tương tác</small>
+            </div>
+        </div>
+        
+        <!-- Error Display -->
+        <div class="error" id="error" role="alert"></div>
+        
+        <!-- Results Display -->
+        <div class="results" id="results" role="region" aria-label="Kết quả tìm kiếm thuốc"></div>
+        
+        <!-- Clinical Warning -->
+        <div class="warning">
+            <h4><i class="fas fa-exclamation-triangle"></i> Lưu ý quan trọng cho bác sĩ:</h4>
+            <ul>
+                <li><strong>Hỗ trợ quyết định:</strong> Đây là hệ thống hỗ trợ, không thay thế chẩn đoán lâm sàng của bác sĩ</li>
+                <li><strong>Thông tin toàn diện:</strong> Cần kết hợp với khám lâm sàng, tiền sử bệnh và xét nghiệm</li>
+                <li><strong>An toàn thuốc:</strong> Luôn kiểm tra tương tác thuốc và chống chỉ định trước khi kê đơn</li>
+                <li><strong>Cá thể hóa:</strong> Điều chỉnh liều lượng phù hợp với tuổi, cân nặng và tình trạng bệnh nhân</li>
+                <li><strong>Theo dõi:</strong> Giám sát hiệu quả điều trị và tác dụng phụ sau khi kê đơn</li>
+            </ul>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="quick-stats">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h4><a href="{{ url_for('all_drugs') }}" style="color: inherit; text-decoration: none;">5,000+</a></h4>
+                        <p>Thuốc trong cơ sở dữ liệu</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h4>100,000+</h4>
+                        <p>Lượt tìm kiếm mỗi tháng</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h4>62%</h4>
+                        <p>Độ chính xác dự đoán</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-user-md"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h4>1,000+</h4>
+                        <p>Bác sĩ tin dùng</p>
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

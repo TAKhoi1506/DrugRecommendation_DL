@@ -1,0 +1,100 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Admin Dashboard - DrugRecommend{% endblock %}
+
+{% block extra_css %}
+{{super()}}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-header">
+        <h1><i class="fas fa-tachometer-alt"></i> Admin Dashboard</h1>
+        <p>Chào mừng {{ user.full_name }} - Quản trị hệ thống DrugRecommend</p>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3><i class="fas fa-users"></i> Tổng người dùng</h3>
+            <div class="stat-value">{{ stats.total_users }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <h3><i class="fas fa-search"></i> Tổng tìm kiếm</h3>
+            <div class="stat-value">{{ stats.total_searches }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <h3><i class="fas fa-pills"></i> Thuốc trong hệ thống</h3>
+            <div class="stat-value">{{ stats.total_drugs}}</div>
+        </div>
+        
+        <div class="stat-card">
+            <h3><i class="fas fa-clock"></i> Hoạt động hôm nay</h3>
+            <div class="stat-value">{{ stats.recent_searches|length }}</div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions-section">
+        <h3><i class="fas fa-bolt"></i> Thao tác nhanh</h3>
+        <div class= "quick-actions-grid">
+            
+            <!-- Quản lý thuốc -->
+            <div style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-left: 4px solid #e74c3c;">
+                <h4><i class="fas fa-pills" style="color: #e74c3c;"></i> Quản lý Database Thuốc</h4>
+                <p>Thêm, sửa, xóa thông tin thuốc</p>
+                <a href="{{ url_for('admin_drugs') }}" style="background: #e74c3c; color: white; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-size: 14px;float: right;">
+                    <i class="fas fa-arrow-right"></i> Truy cập
+                </a>
+            </div>
+            
+            <!-- Thống kê -->
+            <div style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-left: 4px solid #27ae60;">
+                <h4><i class="fas fa-chart-bar" style="color: #27ae60;"></i> Thống kê hoạt động</h4>
+                <p>Nhập liệu hàng loạt từ file</p>
+                <a href="{{ url_for('stats') }}" style="background: #27ae60; color: white; padding: 8px 15px; border-radius: 6px; text-decoration: none; font-size: 14px;float: right;">
+                    <i class="fas fa-arrow-right"></i> Truy cập
+                </a>
+            </div>
+            
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="recent-activity">
+        <h3><i class="fas fa-history"></i> Hoạt động gần đây</h3>
+        
+        {% if stats.recent_searches %}
+            {% for search in stats.recent_searches %}
+            <div class="search-item">
+                <div>
+                    <div class="search-symptoms">{{ search.symptoms }}</div>
+                    <div class="search-meta">
+                        {% if search.username %}
+                            Bởi: {{ search.username }} • 
+                        {% endif %}
+                        {{ search.search_time }}
+                    </div>
+                </div>
+                <div class="search-results">{{ search.results_count }} kết quả</div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-inbox fa-3x"></i>
+                <p>Chưa có hoạt động nào</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Admin Actions -->
+    <div class="admin-actions">
+        <a href="{{ url_for('index') }}" class="btn-admin">
+            <i class="fas fa-home"></i> Về trang chủ
+        </a>
+    </div>
+</div>
+{% endblock %}

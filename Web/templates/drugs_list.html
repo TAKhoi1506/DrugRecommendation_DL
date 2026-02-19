@@ -1,0 +1,212 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Danh sách thuốc - DrugRecommend{% endblock %}
+
+{% block extra_css %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/drugs_list.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="drugs-container">
+    <!-- Header -->
+    <div class="drugs-header">
+        <h1><i class="fas fa-pills"></i> Danh sách thuốc</h1>
+        <p>Tìm hiểu thông tin về các loại thuốc trong hệ thống</p>
+        <div style="margin-top: 15px;">
+            <strong>Tổng số: {{ pagination.total }} thuốc</strong>
+        </div>
+    </div>
+
+    <!-- Search Section -->
+    <div class="search-section">
+        <form method="GET">
+            <div class="search-box">
+                <input type="text" 
+                       name="search" 
+                       class="search-input"
+                       placeholder="Tìm kiếm thuốc theo tên hoặc công dụng..."
+                       value="{{ search }}">
+                <button type="submit" class="search-btn">
+                    <i class="fas fa-search"></i> Tìm kiếm
+                </button>
+            </div>
+        </form>
+        
+        {% if search %}
+        <div style="text-align: center; margin-top: 15px;">
+            <span style="color: #6c757d;">Kết quả tìm kiếm cho: "<strong>{{ search }}</strong>"</span>
+            <a href="{{ url_for('all_drugs') }}" style="margin-left: 15px; color: #3498db;">
+                <i class="fas fa-times"></i> Xóa bộ lọc
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Drugs Grid -->
+    {% if drugs %}
+        <div class="drugs-grid">
+            {% for drug in drugs %}
+            <div class="drug-card">
+                <div class="drug-name">{{ drug.drug_name }}</div>
+                <div class="drug-class">{{ drug.drug_class }}</div>
+                
+                <div class="drug-indication">
+                    <strong>Công dụng:</strong> 
+                    {{ drug.indication[:100] }}{% if drug.indication|length > 100 %}...{% endif %}
+                </div>
+                
+                <div class="drug-actions">
+                    <button class="btn btn-primary" 
+                            data-drug-index="{{ drug.index }}" 
+                            data-drug-name="{{ drug.drug_name }}" 
+                            onclick="showDrugDetailSafe(this)">
+                        <i class="fas fa-info-circle"></i> Chi tiết
+                    </button>
+                    
+                    {% if user %}
+                    <button class="btn btn-success" 
+                            id="save-btn-{{ drug.index }}" 
+                            data-drug-index="{{ drug.index }}" 
+                            data-drug-name="{{ drug.drug_name }}" 
+                            data-drug-class="{{ drug.drug_class }}"
+                            onclick="saveDrugFromListSafe(this)">
+                        <i class="fas fa-bookmark"></i> Lưu
+                    </button>
+                    {% endif %}
+                </div>
+
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination nâng cao -->
+        <div class="pagination">
+            <!-- Nút Trang đầu -->
+            {% if pagination.page > 1 %}
+                <a href="{{ url_for('all_drugs', page=1, search=search) }}" class="pagination-first">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+            {% endif %}
+            
+            <!-- Nút Trước -->
+            {% if pagination.has_prev %}
+                <a href="{{ url_for('all_drugs', page=pagination.prev_num, search=search) }}">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+            {% endif %}
+            
+            <!-- Logic pagination thông minh -->
+            {% if pagination.total_pages <= 7 %}
+                <!-- Hiển thị tất cả nếu ít hơn 7 trang -->
+                {% for page_num in range(1, pagination.total_pages + 1) %}
+                    {% if page_num == pagination.page %}
+                        <span class="current">{{ page_num }}</span>
+                    {% else %}
+                        <a href="{{ url_for('all_drugs', page=page_num, search=search) }}">{{ page_num }}</a>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <!-- Logic phức tạp cho nhiều trang -->
+                {% if pagination.page <= 4 %}
+                    <!-- Gần đầu: 1 2 3 4 5 ... cuối -->
+                    {% for page_num in range(1, 6) %}
+                        {% if page_num == pagination.page %}
+                            <span class="current">{{ page_num }}</span>
+                        {% else %}
+                            <a href="{{ url_for('all_drugs', page=page_num, search=search) }}">{{ page_num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    <span class="ellipsis">...</span>
+                    <a href="{{ url_for('all_drugs', page=pagination.total_pages, search=search) }}">{{ pagination.total_pages }}</a>
+                    
+                {% elif pagination.page >= pagination.total_pages - 3 %}
+                    <!-- Gần cuối: 1 ... n-4 n-3 n-2 n-1 n -->
+                    <a href="{{ url_for('all_drugs', page=1, search=search) }}">1</a>
+                    <span class="ellipsis">...</span>
+                    {% for page_num in range(pagination.total_pages - 4, pagination.total_pages + 1) %}
+                        {% if page_num == pagination.page %}
+                            <span class="current">{{ page_num }}</span>
+                        {% else %}
+                            <a href="{{ url_for('all_drugs', page=page_num, search=search) }}">{{ page_num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    
+                {% else %}
+                    <!-- Ở giữa: 1 ... p-1 p p+1 ... n -->
+                    <a href="{{ url_for('all_drugs', page=1, search=search) }}">1</a>
+                    <span class="ellipsis">...</span>
+                    {% for page_num in range(pagination.page - 1, pagination.page + 2) %}
+                        {% if page_num == pagination.page %}
+                            <span class="current">{{ page_num }}</span>
+                        {% else %}
+                            <a href="{{ url_for('all_drugs', page=page_num, search=search) }}">{{ page_num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    <span class="ellipsis">...</span>
+                    <a href="{{ url_for('all_drugs', page=pagination.total_pages, search=search) }}">{{ pagination.total_pages }}</a>
+                {% endif %}
+            {% endif %}
+            
+            <!-- Nút Sau -->
+            {% if pagination.has_next %}
+                <a href="{{ url_for('all_drugs', page=pagination.next_num, search=search) }}">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            {% endif %}
+            
+            <!-- Nút Trang cuối -->
+            {% if pagination.page < pagination.total_pages %}
+                <a href="{{ url_for('all_drugs', page=pagination.total_pages, search=search) }}" class="pagination-last">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            {% endif %}
+        </div>
+
+    {% else %}
+        <div class="empty-state">
+            <i class="fas fa-pills fa-3x" style="opacity: 0.3; margin-bottom: 20px;"></i>
+            <h3>Không tìm thấy thuốc nào</h3>
+            {% if search %}
+                <p>Thử tìm kiếm với từ khóa khác</p>
+            {% else %}
+                <p>Hiện tại chưa có thuốc nào trong hệ thống</p>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <!-- Back to Home -->
+    <div style="text-align: center; margin-top: 30px;">
+        <a href="{{ url_for('index') }}" class="btn btn-primary" style="padding: 10px 20px;">
+            <i class="fas fa-home"></i> Về trang chủ
+        </a>
+    </div>
+</div>
+
+<script>
+// Sử dụng các hàm từ app.js
+function showDrugDetailSafe(button) {
+    const drugIndex = button.getAttribute('data-drug-index');
+    const drugName = button.getAttribute('data-drug-name');
+    
+    if (typeof window.showDrugDetail === 'function') {
+        window.showDrugDetail(parseInt(drugIndex), drugName);
+    } else {
+        alert('Đang tải thông tin chi tiết...');
+        window.location.href = `/drug/${drugIndex}`;
+    }
+}
+
+function saveDrugFromListSafe(button) {
+    const drugIndex = button.getAttribute('data-drug-index');
+    const drugName = button.getAttribute('data-drug-name');
+    const drugClass = button.getAttribute('data-drug-class');
+    
+    if (typeof window.saveDrugToList === 'function') {
+        window.saveDrugToList(parseInt(drugIndex), drugName, drugClass, 'Xem danh sách thuốc', 0);
+    } else {
+        alert('Lỗi tải danh sách thuốc');
+    }
+}
+</script>
+{% endblock %}

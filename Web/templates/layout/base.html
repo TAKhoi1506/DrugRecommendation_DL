@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="{% block meta_description %}Hệ thống hỗ trợ quyết định lâm sàng thông minh, gợi ý thuốc dựa trên triệu chứng. Hỗ trợ bác sĩ đưa ra quyết định điều trị tối ưu và an toàn.{% endblock %}">
+    <meta name="keywords" content="{% block meta_keywords %}hệ thống hỗ trợ quyết định, gợi ý thuốc, AI y tế, machine learning, bác sĩ, điều trị{% endblock %}">
+    <meta name="author" content="DrugRecommend Team">
+
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="{% block og_title %}DrugRecommend - Hệ thống hỗ trợ quyết định lâm sàng{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Gợi ý thuốc thông minh dựa trên triệu chứng với AI{% endblock %}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://drugrecommend.vn">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==">
+    
+    <title>{% block title %}Hệ thống Hỗ trợ Quyết định Lâm sàng - Gợi ý Thuốc{% endblock %}</title>
+    
+    {% block extra_css %}
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% endblock %}
+</head>
+<body>
+    <!-- Header -->
+    {% include 'layout/header.html' %}
+
+    <!-- Main Content -->
+    {% block content %}{% endblock %}
+
+    <!-- Footer -->
+    {% include 'layout/footer.html' %}
+
+    <!-- Scroll to Top Button -->
+    <button class="scroll-to-top" id="scrollToTop">
+        <i class="fas fa-chevron-up"></i>
+    </button>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

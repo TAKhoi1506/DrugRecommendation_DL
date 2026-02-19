@@ -1,0 +1,378 @@
+{% extends "layout/base.html" %}
+
+{% block title %}
+{% if mode == 'add' %}Thêm thuốc mới{% else %}Sửa thuốc{% endif %} - Admin
+{% endblock %}
+
+{% block extra_css %}
+{{ super() }}
+<style>
+/* Flash Messages Styles */
+.alerts {
+    margin-bottom: 20px;
+}
+
+.alert {
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    animation: slideInDown 0.3s ease-out;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.alert-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border-color: #ffeaa7;
+}
+
+.alert-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border-color: #bee5eb;
+}
+
+.alert i {
+    font-size: 1.2em;
+}
+
+.alert-success i:before { content: '\f058'; } /* fa-check-circle */
+.alert-error i:before { content: '\f071'; } /* fa-exclamation-triangle */
+.alert-warning i:before { content: '\f06a'; } /* fa-exclamation-circle */
+.alert-info i:before { content: '\f05a'; } /* fa-info-circle */
+
+@keyframes slideInDown {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Form Container */
+.form-container {
+    max-width: 800px;
+    margin: 100px auto;
+    padding: 20px;
+}
+
+.form-header {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: white;
+    padding: 25px;
+    border-radius: 15px 15px 0 0;
+    text-align: center;
+    margin-bottom: 0;
+}
+
+.form-header h1 {
+    margin: 0 0 10px 0;
+    font-size: 1.8em;
+}
+
+.form-content {
+    background: white;
+    padding: 30px;
+    border-radius: 0 0 15px 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    box-sizing: border-box;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+}
+
+.form-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+}
+
+.btn {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-success {
+    background: linear-gradient(45deg, #28a745, #20c997);
+    color: white;
+}
+
+.btn-success:hover {
+    background: linear-gradient(45deg, #20c997, #17a2b8);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3);
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <div class="form-header">
+        <h1>
+            {% if mode == 'add' %}
+                <i class="fas fa-plus"></i> Thêm thuốc mới
+            {% else %}
+                <i class="fas fa-edit"></i> Sửa thông tin thuốc
+            {% endif %}
+        </h1>
+        <p>{% if mode == 'add' %}Nhập thông tin thuốc mới vào hệ thống{% else %}Cập nhật thông tin thuốc{% endif %}</p>
+    </div>
+    
+    <!-- Flash Messages với data attributes -->
+    <div class="alerts">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}" 
+                         data-alert-type="{{ category }}"
+                         data-message="{{ message|e }}">
+                        <i class="fas" aria-hidden="true"></i>
+                        <span>{{ message }}</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="form-content">
+        <form method="POST">
+            <div class="form-group">
+                <label for="drug_name">
+                    <i class="fas fa-pills"></i> Tên thuốc *
+                </label>
+                <input type="text" 
+                       id="drug_name"
+                       name="drug_name" 
+                       class="form-control"
+                       value="{{ drug.drug_name if drug else '' }}" 
+                       required
+                       placeholder="VD: Paracetamol 500mg"
+                       data-field="drug_name">
+            </div>
+
+            <div class="form-group">
+                <label for="drug_class">
+                    <i class="fas fa-tags"></i> Phân loại
+                </label>
+                <input type="text" 
+                       id="drug_class"
+                       name="drug_class" 
+                       class="form-control"
+                       value="{{ drug.drug_class if drug else '' }}"
+                       placeholder="VD: Giảm đau hạ sốt"
+                       data-field="drug_class">
+            </div>
+
+            <div class="form-group">
+                <label for="ingredients">
+                    <i class="fas fa-flask"></i> Thành phần
+                </label>
+                <textarea id="ingredients"
+                          name="ingredients" 
+                          rows="3"
+                          class="form-control"
+                          placeholder="Nhập thành phần chính của thuốc"
+                          data-field="ingredients">{{ drug.ingredients if drug else '' }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="indication">
+                    <i class="fas fa-info-circle"></i> Chỉ định
+                </label>
+                <textarea id="indication"
+                          name="indication" 
+                          rows="4"
+                          class="form-control"
+                          placeholder="Nhập các chỉ định sử dụng thuốc"
+                          data-field="indication">{{ drug.indication if drug else '' }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="contraindication">
+                    <i class="fas fa-exclamation-triangle"></i> Chống chỉ định
+                </label>
+                <textarea id="contraindication"
+                          name="contraindication" 
+                          rows="3"
+                          class="form-control"
+                          placeholder="Nhập các trường hợp chống chỉ định"
+                          data-field="contraindication">{{ drug.contraindication if drug else '' }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="side_effects">
+                    <i class="fas fa-exclamation-circle"></i> Tác dụng phụ
+                </label>
+                <textarea id="side_effects"
+                          name="side_effects" 
+                          rows="3"
+                          class="form-control"
+                          placeholder="Nhập các tác dụng phụ có thể gặp"
+                          data-field="side_effects">{{ drug.side_effects if drug else '' }}</textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-success" data-action="submit">
+                    <i class="fas fa-save"></i> 
+                    {% if mode == 'add' %}Thêm thuốc{% else %}Cập nhật{% endif %}
+                </button>
+                <a href="{{ url_for('admin_drugs') }}" 
+                   class="btn btn-secondary"
+                   data-action="cancel">
+                    <i class="fas fa-arrow-left"></i> Quay lại
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Form validation và interaction
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-dismiss alerts after 5 seconds
+    const alerts = document.querySelectorAll('.alert');
+    alerts.forEach(alert => {
+        const alertType = alert.getAttribute('data-alert-type');
+        
+        if (alertType === 'success') {
+            setTimeout(() => {
+                alert.style.animation = 'slideOutUp 0.3s ease-out forwards';
+                setTimeout(() => alert.remove(), 300);
+            }, 3000);
+        }
+    });
+    
+    // Form submission confirmation
+    const form = document.querySelector('form');
+    const submitBtn = document.querySelector('[data-action="submit"]');
+    
+    form.addEventListener('submit', function(e) {
+        const drugName = document.querySelector('[data-field="drug_name"]').value.trim();
+        
+        if (!drugName) {
+            e.preventDefault();
+            showAlert('Vui lòng nhập tên thuốc', 'error');
+            return;
+        }
+        
+        // Show loading state
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang xử lý...';
+        submitBtn.disabled = true;
+    });
+    
+    // Field validation
+    const requiredFields = document.querySelectorAll('input[required], textarea[required]');
+    requiredFields.forEach(field => {
+        field.addEventListener('blur', function() {
+            if (!this.value.trim()) {
+                this.style.borderColor = '#e74c3c';
+            } else {
+                this.style.borderColor = '#ddd';
+            }
+        });
+    });
+});
+
+// Utility function to show alert
+function showAlert(message, type) {
+    const alertsContainer = document.querySelector('.alerts');
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type}`;
+    alertDiv.setAttribute('data-alert-type', type);
+    alertDiv.setAttribute('data-message', message);
+    alertDiv.innerHTML = `
+        <i class="fas" aria-hidden="true"></i>
+        <span>${message}</span>
+    `;
+    
+    alertsContainer.appendChild(alertDiv);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        alertDiv.style.animation = 'slideOutUp 0.3s ease-out forwards';
+        setTimeout(() => alertDiv.remove(), 300);
+    }, 5000);
+}
+
+// Add slideOutUp animation
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideOutUp {
+        from {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateY(-20px);
+            opacity: 0;
+        }
+    }
+`;
+document.head.appendChild(style);
+</script>
+{% endblock %}

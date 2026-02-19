@@ -1,0 +1,179 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Thông tin cá nhân - DrugRecommend{% endblock %}
+
+{% block extra_css %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
+{% endblock %}
+
+{% block content %}
+
+<div class="profile-container">
+    <!-- Header -->
+    <div class="profile-header">
+        <h1><i class="fas fa-user-circle"></i> Thông tin cá nhân</h1>
+        <p>Quản lý thông tin tài khoản của bạn</p>
+    </div>
+
+    <!-- Alerts -->
+    <div class="alerts">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- User Info Section -->
+    <div class="profile-section">
+        <h3><i class="fas fa-info-circle"></i> Thông tin tài khoản</h3>
+        
+        <div class="user-info">
+            <h5>Thông tin hiện tại:</h5>
+            <p><strong>Tên đăng nhập:</strong> {{ profile.username }}</p>
+            <p><strong>Họ và tên:</strong> {{ profile.full_name }}</p>
+            <p><strong>Loại tài khoản:</strong> 
+                {% if profile.role == 'admin' %}
+                    <span style="color: #e74c3c;">Quản trị viên</span>
+                {% else %}
+                    <span style="color: #27ae60;">Người dùng</span>
+                {% endif %}
+            </p>
+            <p><strong>Ngày tạo:</strong> {{ profile.created_at }}</p>
+        </div>
+
+        <!-- Update Profile Form -->
+        <form method="POST" action="{{ url_for('update_profile') }}">
+            <div class="form-group">
+                <label for="username">
+                    <i class="fas fa-user"></i> Tên đăng nhập
+                </label>
+                <input type="text" 
+                       id="username" 
+                       class="form-control" 
+                       value="{{ profile.username }}"
+                       disabled>
+                <small style="color: #6c757d;">Tên đăng nhập không thể thay đổi</small>
+            </div>
+
+            <div class="form-group">
+                <label for="full_name">
+                    <i class="fas fa-id-card"></i> Họ và tên *
+                </label>
+                <input type="text" 
+                       id="full_name" 
+                       name="full_name" 
+                       class="form-control" 
+                       value="{{ profile.full_name }}"
+                       required 
+                       placeholder="Nhập họ và tên">
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Cập nhật thông tin
+            </button>
+        </form>
+    </div>
+
+    <!-- Change Password Section -->
+    <div class="profile-section">
+        <h3><i class="fas fa-lock"></i> Đổi mật khẩu</h3>
+        
+        <form method="POST" action="{{ url_for('change_password_route') }}">
+            <div class="form-group">
+                <label for="current_password">
+                    <i class="fas fa-key"></i> Mật khẩu hiện tại *
+                </label>
+                <input type="password" 
+                       id="current_password" 
+                       name="current_password" 
+                       class="form-control" 
+                       required 
+                       placeholder="Nhập mật khẩu hiện tại">
+            </div>
+
+            <div class="form-group">
+                <label for="new_password">
+                    <i class="fas fa-lock"></i> Mật khẩu mới *
+                </label>
+                <input type="password" 
+                       id="new_password" 
+                       name="new_password" 
+                       class="form-control" 
+                       required 
+                       placeholder="Ít nhất 6 ký tự">
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password">
+                    <i class="fas fa-lock"></i> Xác nhận mật khẩu mới *
+                </label>
+                <input type="password" 
+                       id="confirm_password" 
+                       name="confirm_password" 
+                       class="form-control" 
+                       required 
+                       placeholder="Nhập lại mật khẩu mới">
+            </div>
+
+            <button type="submit" class="btn btn-secondary">
+                <i class="fas fa-key"></i> Đổi mật khẩu
+            </button>
+        </form>
+    </div>
+
+    <!-- Back to Home -->
+    <div style="text-align: center;">
+        <a href="{{ url_for('index') }}" class="back-link">
+            <i class="fas fa-home"></i> Về trang chủ
+        </a>
+    </div>
+</div>
+
+<script>
+// Client-side validation
+document.addEventListener('DOMContentLoaded', function() {
+    const passwordForm = document.querySelector('form[action*="change_password"]');
+    
+    if (passwordForm) {
+        passwordForm.addEventListener('submit', function(e) {
+            const newPassword = document.getElementById('new_password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+            
+            if (newPassword.length < 6) {
+                e.preventDefault();
+                alert('Mật khẩu mới phải có ít nhất 6 ký tự');
+                return false;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                e.preventDefault();
+                alert('Mật khẩu xác nhận không khớp');
+                return false;
+            }
+            
+            return confirm('Bạn có chắc muốn đổi mật khẩu?');
+        });
+    }
+    
+    const profileForm = document.querySelector('form[action*="update_profile"]');
+    
+    if (profileForm) {
+        profileForm.addEventListener('submit', function(e) {
+            const fullName = document.getElementById('full_name').value.trim();
+            
+            if (fullName.length < 2) {
+                e.preventDefault();
+                alert('Họ và tên phải có ít nhất 2 ký tự');
+                return false;
+            }
+            
+            return true;
+        });
+    }
+});
+</script>
+{% endblock %}

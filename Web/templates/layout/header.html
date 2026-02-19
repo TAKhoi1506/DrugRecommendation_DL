@@ -1,0 +1,112 @@
+<nav class="navbar">
+    <div class="nav-container">
+        <a href="{{ url_for('index') }}" class="nav-logo">
+            <i class="fas fa-hospital"></i>
+            <span>DrugRecommend</span>
+        </a>
+        
+        <div class="nav-menu" id="navMenu">
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="{{ url_for('index') }}" class="nav-link">
+                        <i class="fas fa-home"></i> Trang chủ
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#about" class="nav-link">
+                        <i class="fas fa-info-circle"></i> Giới thiệu
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('all_drugs') }}" class="nav-link">
+                        <i class="fas fa-pills"></i> Thuốc
+                    </a>
+                </li>
+                
+                {% if user %}
+                    <!-- Menu khi đã đăng nhập -->
+                    {% if user.role == 'admin' %}
+                    <li class="nav-item">
+                        <a href="{{ url_for('admin_dashboard') }}" class="nav-link">
+                            <i class="fas fa-tachometer-alt"></i> Admin
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item dropdown">
+                        <a href="#" class="nav-link">
+                            <i class="fas fa-user"></i> {{ user.full_name }}
+                        </a>
+                        <div class="dropdown-menu">
+                            <a href="{{ url_for('profile') }}" class="dropdown-item">
+                                <i class="fas fa-user-circle"></i> Thông tin tài khoản
+                            </a>
+                            <a href="{{ url_for('saved_drugs_page') }}" class="dropdown-item">
+                                <i class="fas fa-bookmark"></i> Thuốc đã lưu
+                            </a>
+                            <a href="{{ url_for('search_history_page') }}" class="dropdown-item">
+                                <i class="fas fa-history"></i> Lịch sử tìm kiếm
+                            </a>
+                            <a href="{{ url_for('logout') }}" class="dropdown-item">
+                                <i class="fas fa-sign-out-alt"></i> Đăng xuất
+                            </a>
+                        </div>
+                    </li>
+                {% else %}
+                    <!-- Menu khi chưa đăng nhập -->
+                    <li class="nav-item">
+                        <a href="{{ url_for('login') }}" class="nav-link">
+                            <i class="fas fa-sign-in-alt"></i> Đăng nhập
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ url_for('register') }}" class="nav-link">
+                            <i class="fas fa-user-plus"></i> Đăng ký
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </div>
+        
+        <div class="nav-toggle" id="navToggle">
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+        </div>
+    </div>
+</nav>
+
+<!-- Thêm CSS cho dropdown menu -->
+<style>
+.dropdown {
+    position: relative;
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    min-width: 150px;
+    display: none;
+    z-index: 1001;
+}
+
+.dropdown:hover .dropdown-menu {
+    display: block;
+}
+
+.dropdown-item {
+    display: block;
+    padding: 10px 15px;
+    color: #2c3e50;
+    text-decoration: none;
+    transition: background 0.3s ease;
+}
+
+.dropdown-item:hover {
+    background: #f8f9fa;
+    color: #3498db;
+}
+</style>

@@ -1,0 +1,222 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Thống kê hệ thống - DrugRecommend{% endblock %}
+
+{% block extra_css %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="stats-container">
+    <div class="stats-header">
+        <h1><i class="fas fa-tachometer-alt"></i> Thống kê hệ thống - DrugRecommend</h1>
+        <p>Thống kê hoạt động hệ thống</p>
+    </div>
+
+    <!-- Main Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3><i class="fas fa-users"></i> Tổng người dùng</h3>
+            <div class="stat-value">{{ stats.total_users }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <h3><i class="fas fa-search"></i> Tổng tìm kiếm</h3>
+            <div class="stat-value">{{ stats.total_searches }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <h3><i class="fas fa-search"></i> Tìm kiếm 7 ngày qua</h3>
+            <div class="stat-value">{{ stats.searches_7days or 0 }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <h3><i class="fas fa-clock"></i> User hoạt động gần đây</h3>
+            <div class="stat-value">{{ stats.active_users or 0 }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <h3><i class="fas fa-pills"></i> Thuốc được lưu</h3>
+            <div class="stat-value">{{ stats.total_saved or 0 }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <h3><i class="fas fa-users"></i> User có lưu thuốc</h3>
+            <div class="stat-value">{{ stats.users_with_saved or 0 }}</div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="charts-section">
+        <!-- User Activity Chart -->
+        <div class="chart-card">
+            <h3><i class="fas fa-users"></i> Hoạt động người dùng</h3>
+            <div class="chart-container">
+                <canvas id="userChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Search Statistics Chart -->
+        <div class="chart-card">
+            <h3><i class="fas fa-search"></i> Thống kê tìm kiếm</h3>
+            <div class="chart-container">
+                <canvas id="searchChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Lists -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 25px;">
+        <!-- Top Symptoms List -->
+        <div class="info-section">
+            <h3><i class="fas fa-stethoscope"></i> Triệu chứng phổ biến</h3>
+            {% if stats.top_symptoms %}
+                <div class="symptoms-list">
+                    {% for symptom in stats.top_symptoms %}
+                    <div class="symptom-item">
+                        {{ symptom.symptoms }}
+                        <span class="symptom-count">{{ symptom.count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p style="color: #6c757d; text-align: center; padding: 20px;">Chưa có dữ liệu</p>
+            {% endif %}
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="info-section">
+            <h3><i class="fas fa-history"></i> Hoạt động gần đây</h3>
+            {% if stats.recent_searches %}
+                {% for search in stats.recent_searches %}
+                <div class="recent-item">
+                    <div>
+                        <strong>{{ search.symptoms }}</strong>
+                        {% if search.username %}
+                            <br><small style="color: #6c757d;">Bởi: {{ search.username }}</small>
+                        {% endif %}
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="background: #3498db; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8em;">
+                            {{ search.results_count }} kết quả
+                        </span>
+                        <br><small style="color: #6c757d;">{{ search.search_time }}</small>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: #6c757d; text-align: center; padding: 20px;">Chưa có hoạt động nào</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div style="text-align: center; margin-top: 30px;">
+        <a href="{{ url_for('admin_dashboard') }}" class="back-btn">
+            <i class="fas fa-tachometer-alt"></i> Về Admin Dashboard
+        </a>
+    </div>
+</div>
+
+<script id="stats-data" type="application/json">
+    {{ {
+        'total_users': stats.total_users or 0,
+        'total_searches': stats.total_searches or 0,
+        'searches_7days': stats.searches_7days or 0,
+        'active_users': stats.active_users or 0,
+        'total_saved': stats.total_saved or 0,
+        'users_with_saved': stats.users_with_saved or 0,
+        'top_symptoms': stats.top_symptoms or []
+    } | tojson | safe }}
+    </script>
+    
+    <script>
+    // Simple data parsing
+    function getStatsData() {
+        try {
+            const dataScript = document.getElementById('stats-data');
+            return JSON.parse(dataScript.textContent);
+        } catch (error) {
+            console.error('Error parsing stats data:', error);
+            return {
+                total_users: 0,
+                total_searches: 0,
+                searches_7days: 0,
+                active_users: 0,
+                total_saved: 0,
+                users_with_saved: 0,
+                top_symptoms: []
+            };
+        }
+    }
+    
+    const statsData = getStatsData();
+
+
+    const colors = {
+        primary: '#3498db',
+        secondary: '#e74c3c',
+        success: '#27ae60',
+        warning: '#f39c12'
+    };
+    
+    // 1. Simple User Chart (Doughnut)
+    const userCtx = document.getElementById('userChart').getContext('2d');
+    new Chart(userCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['User hoạt động', 'User không hoạt động'],
+            datasets: [{
+                data: [
+                    statsData.active_users,
+                    Math.max(0, statsData.total_users - statsData.active_users)
+                ],
+                backgroundColor: [colors.success, '#ecf0f1'],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+    
+    // 2. Simple Search Chart (Bar)
+    const searchCtx = document.getElementById('searchChart').getContext('2d');
+    new Chart(searchCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Tổng tìm kiếm', 'Tìm kiếm 7 ngày', 'Thuốc được lưu'],
+            datasets: [{
+                data: [statsData.total_searches, statsData.searches_7days, statsData.total_saved],
+                backgroundColor: [colors.primary, colors.warning, colors.success],
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    
+    </script>
+    {% endblock %}

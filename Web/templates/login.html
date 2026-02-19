@@ -1,0 +1,64 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Đăng nhập - DrugRecommend{% endblock %}
+{% block extra_css %}
+{{super()}}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <i class="fas fa-user-md"></i>
+            <h2>Đăng nhập</h2>
+            <p>Đăng nhập để sử dụng hệ thống gợi ý thuốc</p>
+        </div>
+
+        <div class="alerts">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <form method="POST">
+            <div class="form-group">
+                <label for="username">
+                    <i class="fas fa-user"></i> Tên đăng nhập
+                </label>
+                <input type="text" 
+                       id="username" 
+                       name="username" 
+                       class="form-control" 
+                       required 
+                       autocomplete="username">
+            </div>
+
+            <div class="form-group">
+                <label for="password">
+                    <i class="fas fa-lock"></i> Mật khẩu
+                </label>
+                <input type="password" 
+                       id="password" 
+                       name="password" 
+                       class="form-control" 
+                       required 
+                       autocomplete="current-password">
+            </div>
+
+            <button type="submit" class="btn-auth">
+                <i class="fas fa-sign-in-alt"></i> Đăng nhập
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Chưa có tài khoản? <a href="{{ url_for('register') }}">Đăng ký ngay</a></p>
+            <small>Tài khoản demo: admin/admin123</small>
+        </div>
+    </div>
+</div>
+{% endblock %}

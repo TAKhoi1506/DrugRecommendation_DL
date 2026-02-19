@@ -1,0 +1,279 @@
+.admin-container {
+    padding: 40px 20px;
+    margin: 0 auto;
+}
+
+.admin-header {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: white;
+    padding: 30px;
+    border-radius: 15px;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.admin-header h1 {
+    margin: 0 0 10px 0;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+    align-items: stretch;
+}
+
+.stat-card {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border-left: 4px solid #3498db;
+
+    display: flex;
+    flex-direction: column;
+    min-height: 100px;
+}
+
+.stat-card h3 {
+    margin: 0 0 10px 0;
+    color: #2c3e50;
+}
+
+.stat-value {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #3498db;
+}
+
+.recent-activity {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.recent-activity h3 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+}
+
+.search-item {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.search-item:last-child {
+    border-bottom: none;
+}
+
+.search-symptoms {
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.search-meta {
+    font-size: 0.9em;
+    color: #6c757d;
+}
+
+.search-results {
+    background: #3498db;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+}
+
+.admin-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 30px;
+    justify-content: center;
+}
+
+.btn-admin {
+    padding: 12px 20px;
+    background: linear-gradient(45deg, #3498db, #2980b9);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-admin:hover {
+    background: linear-gradient(45deg, #2980b9, #1f4e79);
+    transform: translateY(-2px);
+}
+
+.empty-state {
+    text-align: center;
+    color: #6c757d;
+    padding: 40px;
+}
+
+
+.quick-actions-section {
+    margin: 30px 0;
+}
+
+.quick-actions-section h3 {
+    color: #2c3e50;
+    margin-bottom: 25px;
+    font-size: 1.4em;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+}
+
+.quick-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+    align-items: stretch;
+}
+
+.action-card {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    min-height:120px;
+}
+
+.action-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    text-decoration: none;
+    color: inherit;
+}
+
+.action-card.drugs {
+    border-left: 4px solid #e74c3c;
+}
+
+.action-card.import {
+    border-left: 4px solid #f39c12;
+}
+
+.action-card.backup {
+    border-left: 4px solid #3498db;
+}
+
+.action-card.users {
+    border-left: 4px solid #9b59b6;
+}
+
+.action-card.analytics {
+    border-left: 4px solid #27ae60;
+}
+
+.action-card.settings {
+    border-left: 4px solid #95a5a6;
+}
+
+.action-icon {
+    font-size: 3em;
+    opacity: 0.8;
+    flex-shrink: 0;
+}
+
+.action-card.drugs .action-icon { color: #e74c3c; }
+.action-card.import .action-icon { color: #f39c12; }
+.action-card.backup .action-icon { color: #3498db; }
+.action-card.users .action-icon { color: #9b59b6; }
+.action-card.analytics .action-icon { color: #27ae60; }
+.action-card.settings .action-icon { color: #95a5a6; }
+
+.action-content {
+    flex: 1;
+}
+
+.action-content h4 {
+    margin: 0 0 8px 0;
+    color: #2c3e50;
+    font-size: 1.3em;
+}
+
+.action-content p {
+    margin: 0 0 10px 0;
+    color: #6c757d;
+    line-height: 1.4;
+}
+
+.action-badge {
+    background: #f8f9fa;
+    color: #495057;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+
+@media (max-width: 768px) {
+    .stat-grid{
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    .quick-actions-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .action-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+    }
+    
+    .action-icon {
+        font-size: 2.5em;
+    }
+}
+
+/* Hover effects for different cards */
+.action-card.drugs:hover {
+    background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+}
+
+.action-card.import:hover {
+    background: linear-gradient(135deg, #fffbf5 0%, #ffffff 100%);
+}
+
+.action-card.backup:hover {
+    background: linear-gradient(135deg, #f5f9ff 0%, #ffffff 100%);
+}
+
+.action-card.users:hover {
+    background: linear-gradient(135deg, #f9f5ff 0%, #ffffff 100%);
+}
+
+.action-card.analytics:hover {
+    background: linear-gradient(135deg, #f5fff5 0%, #ffffff 100%);
+}
+
+.action-card.settings:hover {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+
+body .admin-container {
+    max-width: 1400px !important;
+    width: 95% !important;
+}

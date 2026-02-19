@@ -1,0 +1,87 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Đăng ký - DrugRecommend{% endblock %}
+{% block extra_css %}
+{{super()}}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/register.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <i class="fas fa-user-plus"></i>
+            <h2>Đăng ký tài khoản</h2>
+            <p>Tạo tài khoản để sử dụng hệ thống</p>
+        </div>
+
+        <div class="alerts">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <form method="POST">
+            <div class="form-group">
+                <label for="full_name">
+                    <i class="fas fa-id-card"></i> Họ và tên *
+                </label>
+                <input type="text" 
+                       id="full_name" 
+                       name="full_name" 
+                       class="form-control" 
+                       required 
+                       placeholder="VD: Nguyễn Văn A">
+            </div>
+
+            <div class="form-group">
+                <label for="username">
+                    <i class="fas fa-user"></i> Tên đăng nhập *
+                </label>
+                <input type="text" 
+                       id="username" 
+                       name="username" 
+                       class="form-control" 
+                       required 
+                       placeholder="Ít nhất 3 ký tự">
+            </div>
+
+            <div class="form-group">
+                <label for="password">
+                    <i class="fas fa-lock"></i> Mật khẩu *
+                </label>
+                <input type="password" 
+                       id="password" 
+                       name="password" 
+                       class="form-control" 
+                       required 
+                       placeholder="Ít nhất 6 ký tự">
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password">
+                    <i class="fas fa-lock"></i> Xác nhận mật khẩu *
+                </label>
+                <input type="password" 
+                       id="confirm_password" 
+                       name="confirm_password" 
+                       class="form-control" 
+                       required 
+                       placeholder="Nhập lại mật khẩu">
+            </div>
+
+            <button type="submit" class="btn-auth">
+                <i class="fas fa-user-plus"></i> Đăng ký
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Đã có tài khoản? <a href="{{ url_for('login') }}">Đăng nhập ngay</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

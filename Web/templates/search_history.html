@@ -1,0 +1,143 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Lịch sử tìm kiếm - DrugRecommend{% endblock %}
+
+{% block extra_css %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/search_history.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="history-container">
+    <!-- Header -->
+    <div class="history-header">
+        <h1><i class="fas fa-history"></i> Lịch sử tìm kiếm</h1>
+        <p>Xem lại các lần tìm kiếm thuốc của bạn</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="history-stats">
+        <div class="stat-item">
+            <i class="fas fa-search"></i>
+            <span>Tổng cộng: <strong>{{ stats.total_searches }}</strong> lần tìm kiếm</span>
+        </div>
+        <button class="clear-btn" onclick="clearHistory()">
+            <i class="fas fa-trash"></i> Xóa tất cả
+        </button>
+    </div>
+
+    <!-- History List -->
+    {% if history %}
+        <div class="history-list">
+            {% for item in history %}
+            <div class="history-item">
+                <div class="search-info">
+                    <div class="search-symptoms">
+                        <i class="fas fa-search"></i> {{ item.symptoms }}
+                    </div>
+                    <div class="search-meta">
+                        <span>
+                            <i class="fas fa-clock"></i> {{ item.search_time }}
+                        </span>
+                        <span>
+                            <i class="fas fa-pills"></i> {{ item.results_count }} kết quả
+                        </span>
+                    </div>
+                </div>
+                <div class="history-actions">
+                    <a href="{{ url_for('repeat_search', history_id=item.id) }}" 
+                       class="btn-small btn-primary">
+                        <i class="fas fa-redo"></i> Tìm lại
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <i class="fas fa-search"></i>
+            <h3>Chưa có lịch sử tìm kiếm</h3>
+            <p>Hãy bắt đầu tìm kiếm thuốc để xem lịch sử ở đây!</p>
+            <a href="{{ url_for('index') }}" class="back-link">
+                <i class="fas fa-search"></i> Bắt đầu tìm kiếm
+            </a>
+        </div>
+    {% endif %}
+
+    {% if history %}
+    <div style="text-align: center; margin-top: 25px;">
+        <a href="{{ url_for('index') }}" class="back-link">
+            <i class="fas fa-search"></i> Tìm kiếm thêm
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function clearHistory() {
+    if (!confirm('Bạn có chắc muốn xóa toàn bộ lịch sử tìm kiếm?')) {
+        return;
+    }
+    
+    fetch('/clear_history', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification(data.message, 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification('Lỗi: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Lỗi kết nối: ' + error.message, 'error');
+    });
+}
+
+function showNotification(message, type) {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#28a745' : '#dc3545'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        font-size: 14px;
+        animation: slideIn 0.3s ease-out;
+    `;
+    notification.textContent = message;
+    
+    if (!document.getElementById('notification-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'notification-styles';
+        styles.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-out forwards';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+</script>
+{% endblock %}
