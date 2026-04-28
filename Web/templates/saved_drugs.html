@@ -171,6 +171,9 @@
                 if (drug.error) throw new Error(drug.error);
                 
                 modal.querySelector('.modal-content').innerHTML = `
+                    <div style="text-align:center;margin-bottom:20px;">
+                        <img src="${drug.image_url || '/static/images/drug-placeholder.svg'}" alt="${drug.name}" style="max-width:220px;width:100%;height:220px;object-fit:contain;border-radius:12px;background:#f8f9fa;padding:12px;border:1px solid #e9ecef;" onerror="this.onerror=null;this.src='/static/images/drug-placeholder.svg';">
+                    </div>
                     <div style="background:linear-gradient(135deg,#f8f9fa,#e9ecef);padding:20px;border-radius:10px;margin-bottom:20px">
                         <h3 style="margin:0 0 15px 0;color:#2c3e50">${drug.name}</h3>
                         <span style="background:#e9ecef;color:#495057;padding:4px 8px;border-radius:12px;font-size:12px">${drug.drug_class}</span>

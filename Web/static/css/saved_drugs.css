@@ -38,7 +38,7 @@
 
 .saved-drugs-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 25px;
 }
 
@@ -264,9 +264,33 @@
 
 .saved-drugs-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 25px;
     align-items: stretch; /* Giãn tất cả card cùng chiều cao */
+}
+
+@media (max-width: 1600px) {
+    .saved-drugs-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1280px) {
+    .saved-drugs-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .saved-drugs-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    .saved-drugs-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .saved-drug-card .btn {
@@ -306,5 +330,77 @@
     .saved-drug-card .btn {
         flex: none;
         width: 100%;
+    }
+}
+
+/* ==================== SAVED DRUGS LAYOUT REFRESH ==================== */
+.saved-container {
+    max-width: 1500px;
+}
+
+.saved-container .saved-drugs-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    align-items: stretch;
+}
+
+.saved-container .saved-drug-card {
+    min-height: auto;
+    max-height: none;
+    height: auto;
+    padding: 18px;
+    border-radius: 14px;
+}
+
+.saved-container .saved-drug-card .drug-name {
+    font-size: 1.05rem;
+    line-height: 1.4;
+    min-height: auto;
+    max-height: none;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: normal;
+    overflow-wrap: anywhere;
+}
+
+.saved-container .saved-info {
+    margin: 12px 0;
+}
+
+.saved-container .saved-info,
+.saved-container .notes-section {
+    font-size: 0.92rem;
+}
+
+.saved-container .drug-actions {
+    margin-top: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.saved-container .drug-actions .btn {
+    width: 100%;
+    justify-content: center;
+    padding: 9px 10px;
+    font-size: 12px;
+}
+
+@media (max-width: 1280px) {
+    .saved-container .saved-drugs-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .saved-container .saved-drugs-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .saved-container .drug-actions {
+        grid-template-columns: 1fr;
     }
 }

@@ -1,6 +1,6 @@
 {% extends "layout/base.html" %}
 
-{% block title %}Lịch sử tìm kiếm - DrugRecommend{% endblock %}
+{% block title %}Lịch sử phân tích - DrugRecommend{% endblock %}
 
 {% block extra_css %}
 {{ super() }}
@@ -11,8 +11,8 @@
 <div class="history-container">
     <!-- Header -->
     <div class="history-header">
-        <h1><i class="fas fa-history"></i> Lịch sử tìm kiếm</h1>
-        <p>Xem lại các lần tìm kiếm thuốc của bạn</p>
+        <h1><i class="fas fa-history"></i> Lịch sử phân tích</h1>
+        <p>Xem lại các lần phân tích triệu chứng và gợi ý thuốc của bạn</p>
     </div>
 
     <!-- Stats -->
@@ -56,10 +56,10 @@
     {% else %}
         <div class="empty-state">
             <i class="fas fa-search"></i>
-            <h3>Chưa có lịch sử tìm kiếm</h3>
-            <p>Hãy bắt đầu tìm kiếm thuốc để xem lịch sử ở đây!</p>
+            <h3>Chưa có lịch sử phân tích</h3>
+            <p>Hãy bắt đầu phân tích triệu chứng để xem lại ở đây!</p>
             <a href="{{ url_for('index') }}" class="back-link">
-                <i class="fas fa-search"></i> Bắt đầu tìm kiếm
+                <i class="fas fa-search"></i> Bắt đầu phân tích
             </a>
         </div>
     {% endif %}
@@ -67,7 +67,7 @@
     {% if history %}
     <div style="text-align: center; margin-top: 25px;">
         <a href="{{ url_for('index') }}" class="back-link">
-            <i class="fas fa-search"></i> Tìm kiếm thêm
+            <i class="fas fa-search"></i> Phân tích thêm
         </a>
     </div>
     {% endif %}
@@ -75,7 +75,7 @@
 
 <script>
 function clearHistory() {
-    if (!confirm('Bạn có chắc muốn xóa toàn bộ lịch sử tìm kiếm?')) {
+    if (!confirm('Bạn có chắc muốn xóa toàn bộ lịch sử phân tích?')) {
         return;
     }
     

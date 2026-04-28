@@ -1,113 +1,485 @@
 from flask import Flask, render_template, request, jsonify, redirect, session, flash, url_for
 import pandas as pd
-import pickle
-import joblib
 import os
 import re
+import json
+import uuid
 import math
+import hashlib
 import numpy as np
-from scipy.sparse import hstack
-from utils import classify_drug_type
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from transformers import AutoTokenizer, AutoModel
+from werkzeug.utils import secure_filename
 from init import (
     change_password, clear_search_history, get_db, get_search_history, 
     get_search_statistics, get_user_profile, init_database, create_user, 
     log_search_enhanced, track_drug_click, update_user_profile, verify_user, 
-    log_search, get_stats, save_drug, get_saved_drugs, remove_saved_drug, is_drug_saved,
-    get_all_drugs, add_drug, delete_drug
+    get_stats, save_drug, get_saved_drugs, remove_saved_drug, is_drug_saved,
+    get_all_drugs, add_drug as add_drug_to_master, delete_drug,
 )
 from functools import wraps
 from datetime import timedelta
 
-app = Flask(__name__, template_folder='templates', static_folder='static')
-
-
-app.config['SECRET_KEY'] = 'simple-secret-key-for-demo'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
-
-init_database()
-
-# Decorators
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            flash('Vui lòng đăng nhập để truy cập.', 'warning')
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session or session.get('role') != 'admin':
-            flash('Bạn không có quyền truy cập.', 'error')
-            return redirect(url_for('index'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-
 
 class EnhancedDrugRecommendationEngine:
     def __init__(self):
-        self.model_package = None
         self.data_final = None
+        self.tokenizer = None
+        self.phobert_model = None
+        self.drug_embeddings = None
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.max_length = int(os.getenv("DRUG_MAX_LENGTH", "128"))
+
+        self.name_col = 'ten_thuoc'
+        self.ingredients_col = 'thanh_phan'
+        self.indication_col = 'chi_dinh'
+        self.contra_col = 'chong_chi_dinh'
+        self.side_effect_col = 'tac_dung_phu'
+        self.usage_col = None
+        self.caution_col = None
+        self.packing_col = None
+        self.dosage_form_col = None
+        self.manufacturer_col = None
+        self.price_col = None
+        self.category_col = None
+        self.source_col = 'source'
+
         self.load_models()
         self.symptom_mapping = self._create_symptom_mapping()
+
+    # class PhoBERTFineTuner(nn.Module):
+    #     def __init__(self, model_name="vinai/phobert-base", hidden_dim=768):
+    #         super().__init__()
+    #         self.phobert = AutoModel.from_pretrained(model_name)
+    #         self.attention = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=8, batch_first=True)
+    #         self.dropout = nn.Dropout(0.1)
+    #         self.projection = nn.Linear(hidden_dim, hidden_dim)
+
+    #     def forward(self, input_ids, attention_mask):
+    #         outputs = self.phobert(input_ids=input_ids, attention_mask=attention_mask)
+    #         hidden_states = outputs.last_hidden_state
+    #         key_padding_mask = (attention_mask == 0)
+    #         attention_output, _ = self.attention(
+    #             hidden_states, hidden_states, hidden_states,
+    #             key_padding_mask=key_padding_mask,
+    #             need_weights=False,
+    #         )
+    #         cls_output = attention_output[:, 0, :]
+    #         cls_output = self.dropout(cls_output)
+    #         embeddings = self.projection(cls_output)
+    #         embeddings = F.normalize(embeddings, p=2, dim=1)
+    #         return embeddings
+
+    class PhoBERTFineTuner(nn.Module):
+        def __init__(self, model_name="vinai/phobert-base", hidden_dim=768, dropout=0.1):
+            super().__init__()
+            self.phobert = AutoModel.from_pretrained(model_name)
+            self.attention = nn.MultiheadAttention(
+                embed_dim=hidden_dim, num_heads=8, batch_first=True
+            )
+            self.projection = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Dropout(float(dropout)),
+                nn.Linear(hidden_dim, 768),
+            )
+
+        @staticmethod
+        def _masked_mean_pool(token_embeddings, attention_mask):
+            mask = attention_mask.unsqueeze(-1).type_as(token_embeddings)
+            return (token_embeddings * mask).sum(1) / mask.sum(1).clamp(min=1e-6)
+
+        def forward(self, input_ids, attention_mask):
+            outputs = self.phobert(input_ids=input_ids, attention_mask=attention_mask)
+            hidden_states = outputs.last_hidden_state
+            key_padding_mask = (attention_mask == 0)
+            attention_output, _ = self.attention(
+                hidden_states, hidden_states, hidden_states,
+                key_padding_mask=key_padding_mask,
+                need_weights=False,
+            )
+            pooled = self._masked_mean_pool(attention_output, attention_mask)
+            embeddings = self.projection(pooled)
+            return F.normalize(embeddings, p=2, dim=1)
+
+    def _get_drug_category(self, row):
+        if self.category_col and self.category_col in row and pd.notna(row[self.category_col]):
+            return str(row[self.category_col])
+        return 'Khác'
+
+    def _is_unwanted_image_url(self, url):
+        u = str(url).lower()
+        unwanted_keywords = [
+            'logo', 'static-website', 'banner', 'avatar', 'zalo',
+            'visa', 'mastercard', 'jcb', 'momo', 'napas', 'apple-pay',
+            'dmca', 'bct', 'freeship', 'search-rx', 'near-by-store',
+            'nurse', 'cod', 'blue-tick', 'topbanner', 'badg'
+        ]
+        if any(k in u for k in unwanted_keywords):
+            return True
+        if u.endswith('.svg'):
+            return True
+        return False
+
+    def _score_image_url(self, url):
+        u = str(url).lower()
+        score = 0
+        if '/images/ecommerce/' in u or '/images/product/' in u:
+            score += 5
+        if '/digital/' in u:
+            score += 3
+        if '_1.' in u or '_1_' in u:
+            score += 1
+        if self._is_unwanted_image_url(u):
+            score -= 10
+        return score
+
+    def _extract_image_urls(self, value):
+        def normalize_url(raw_url):
+            if not raw_url:
+                return None
+
+            text = str(raw_url).strip()
+            if not text or text.lower() == 'nan':
+                return None
+
+            if self._is_unwanted_image_url(text):
+                return None
+
+            if text.startswith('http://') or text.startswith('https://'):
+                return text
+
+            match = re.search(r'https?://[^\s\"\'\|\],]+', text)
+            if match:
+                candidate = match.group(0)
+                if not self._is_unwanted_image_url(candidate):
+                    return candidate
+
+            return None
+
+        if value is None:
+            return []
+
+        if isinstance(value, (list, tuple, set)):
+            iterable_values = list(value)
+        else:
+            text = str(value).strip()
+            if not text or text.lower() == 'nan':
+                return []
+
+            if text.startswith('[') and text.endswith(']'):
+                try:
+                    import ast
+                    parsed = ast.literal_eval(text)
+                    if isinstance(parsed, (list, tuple, set)):
+                        iterable_values = list(parsed)
+                    else:
+                        iterable_values = [parsed]
+                except Exception:
+                    iterable_values = [text]
+            else:
+                iterable_values = [text]
+
+        candidates = []
+        for item in iterable_values:
+            text = str(item).strip()
+            if not text or text.lower() == 'nan':
+                continue
+
+            urls = re.findall(r'https?://[^\s\"\'\|\],]+', text)
+            if urls:
+                for url in urls:
+                    normalized = normalize_url(url)
+                    if normalized:
+                        candidates.append(normalized)
+                continue
+
+            normalized = normalize_url(text)
+            if normalized:
+                candidates.append(normalized)
+
+        unique_candidates = []
+        seen = set()
+        for candidate in candidates:
+            if candidate not in seen:
+                seen.add(candidate)
+                unique_candidates.append(candidate)
+
+        return unique_candidates
+
+    def _extract_image_url(self, value):
+        image_urls = self._extract_image_urls(value)
+        if not image_urls:
+            return None
+        return sorted(image_urls, key=self._score_image_url, reverse=True)[0]
+
+    def _get_image_url(self, row):
+        if self.image_col and self.image_col in row and pd.notna(row[self.image_col]):
+            return self._extract_image_url(row[self.image_col])
+
+        for candidate in ('image_url', 'images', 'image'):
+            if candidate in row and pd.notna(row[candidate]):
+                image_url = self._extract_image_url(row[candidate])
+                if image_url:
+                    return image_url
+
+        return None
+
+    def _get_image_urls(self, row):
+        image_urls = []
+
+        if self.image_col and self.image_col in row and pd.notna(row[self.image_col]):
+            image_urls.extend(self._extract_image_urls(row[self.image_col]))
+
+        for candidate in ('image_url', 'images', 'image'):
+            if candidate in row and pd.notna(row[candidate]):
+                image_urls.extend(self._extract_image_urls(row[candidate]))
+
+        unique_urls = []
+        seen = set()
+        for image_url in image_urls:
+            if image_url not in seen:
+                seen.add(image_url)
+                unique_urls.append(image_url)
+
+        ranked_urls = sorted(unique_urls, key=self._score_image_url, reverse=True)
+        return ranked_urls[:5]
+
+    def _detect_columns(self):
+        columns = set(self.data_final.columns.tolist())
+        self.name_col = 'drug_name' if 'drug_name' in columns else 'ten_thuoc'
+        self.ingredients_col = 'active_ingredient' if 'active_ingredient' in columns else 'thanh_phan'
+        self.indication_col = 'indication' if 'indication' in columns else 'chi_dinh'
+        self.contra_col = 'contraindication' if 'contraindication' in columns else 'chong_chi_dinh'
+        self.side_effect_col = 'side_effect' if 'side_effect' in columns else 'tac_dung_phu'
+        self.usage_col = 'usage' if 'usage' in columns else ('cach_dung' if 'cach_dung' in columns else None)
+        self.caution_col = 'caution' if 'caution' in columns else ('luu_y' if 'luu_y' in columns else None)
+        self.packing_col = 'packing' if 'packing' in columns else ('quy_cach_dong_goi' if 'quy_cach_dong_goi' in columns else None)
+        self.dosage_form_col = 'dosage_form' if 'dosage_form' in columns else ('dang_bao_che' if 'dang_bao_che' in columns else None)
+        self.manufacturer_col = 'manufacturer' if 'manufacturer' in columns else ('nha_san_xuat' if 'nha_san_xuat' in columns else None)
+        self.price_col = 'price' if 'price' in columns else None
+        self.image_col = 'image_url' if 'image_url' in columns else (
+            'images' if 'images' in columns else (
+                'image' if 'image' in columns else None
+            )
+        )
+        self.category_col = 'category_grouped_model' if 'category_grouped_model' in columns else (
+            'category_grouped' if 'category_grouped' in columns else (
+                'category' if 'category' in columns else None
+            )
+        )
+        self.source_col = 'source' if 'source' in columns else None
+
+    def _build_search_text(self, row):
+        name = str(row.get(self.name_col, '')) if pd.notna(row.get(self.name_col, '')) else ''
+        ingredient = str(row.get(self.ingredients_col, '')) if pd.notna(row.get(self.ingredients_col, '')) else ''
+        indication = str(row.get(self.indication_col, '')) if pd.notna(row.get(self.indication_col, '')) else ''
+        contraindication = str(row.get(self.contra_col, '')) if pd.notna(row.get(self.contra_col, '')) else ''
+        return (
+            f"Tên thuốc: {name}. "
+            f"Hoạt chất: {ingredient}. "
+            f"Chỉ định: {indication}. "
+            f"Chống chỉ định: {contraindication}"
+        ).strip()
+
+    def _deduplicate_dataset_for_serving(self):
+        """Loại bỏ bản ghi trùng nhẹ để serving ổn định hơn."""
+        if self.data_final is None or len(self.data_final) == 0:
+            return
+
+        before = len(self.data_final)
+        subset_cols = []
+        for col in [self.name_col, self.ingredients_col, self.indication_col]:
+            if col in self.data_final.columns:
+                subset_cols.append(col)
+
+        if not subset_cols:
+            return
+
+        self.data_final = self.data_final.drop_duplicates(subset=subset_cols, keep='first').reset_index(drop=True)
+        after = len(self.data_final)
+
+        if after < before:
+            print(f"Deduplicated serving dataset: removed {before - after} duplicated rows")
+
+    def _load_phobert_model(self, model_path):
+        if not os.path.exists(model_path):
+            print(f"PhoBERT checkpoint not found: {model_path}")
+            return
+
+        try:
+            print(f"Loading PhoBERT checkpoint from: {model_path}")
+            self.tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base")
+            self.phobert_model = self.PhoBERTFineTuner().to(self.device)
+
+            state_dict = torch.load(model_path, map_location=self.device)
+            self.phobert_model.load_state_dict(state_dict, strict=True)
+            self.phobert_model.eval()
+            print("PhoBERT checkpoint loaded successfully")
+        except Exception as e:
+            print(f"Failed to load PhoBERT checkpoint: {e}")
+            self.phobert_model = None
+            self.tokenizer = None
+
+    def _encode_texts(self, texts, batch_size=32, max_length=None):
+        if self.phobert_model is None or self.tokenizer is None:
+            return None
+
+        if max_length is None:
+            max_length = int(self.max_length)
+
+        embeddings = []
+        with torch.no_grad():
+            for i in range(0, len(texts), batch_size):
+                batch_texts = texts[i:i + batch_size]
+                encoded = self.tokenizer(
+                    batch_texts,
+                    padding=True,
+                    truncation=True,
+                    max_length=max_length,
+                    return_tensors='pt'
+                )
+                encoded = {k: v.to(self.device) for k, v in encoded.items()}
+                batch_emb = self.phobert_model(
+                    encoded['input_ids'],
+                    encoded['attention_mask']
+                )
+                embeddings.append(batch_emb.cpu())
+
+        return torch.cat(embeddings, dim=0)
+
+    def _build_cache_meta(self, dataset_path, model_path, max_length=None):
+        if max_length is None:
+            max_length = int(self.max_length)
+
+        dataset_abs = os.path.abspath(dataset_path)
+        model_abs = os.path.abspath(model_path)
+
+        return {
+            'dataset_path': dataset_abs,
+            'dataset_mtime': os.path.getmtime(dataset_abs),
+            'dataset_size': os.path.getsize(dataset_abs),
+            'model_path': model_abs,
+            'model_mtime': os.path.getmtime(model_abs),
+            'model_size': os.path.getsize(model_abs),
+            'rows': int(len(self.data_final)) if self.data_final is not None else 0,
+            'name_col': self.name_col,
+            'ingredients_col': self.ingredients_col,
+            'indication_col': self.indication_col,
+            'max_length': int(max_length),
+            'model_arch': 'PhoBERTFineTuner',
+            'cache_version': 1,
+        }
+
+    def _get_cache_path(self, dataset_path, model_path):
+        web_dir = os.path.dirname(os.path.abspath(__file__))
+        cache_dir = os.path.join(web_dir, 'cache')
+        os.makedirs(cache_dir, exist_ok=True)
+
+        key = f"{os.path.abspath(dataset_path)}|{os.path.abspath(model_path)}|phobert_finetuner_v1"
+        key_hash = hashlib.md5(key.encode('utf-8')).hexdigest()[:16]
+        return os.path.join(cache_dir, f"drug_embeddings_{key_hash}.pt")
+
+    def _try_load_embedding_cache(self, cache_path, expected_meta):
+        if not os.path.exists(cache_path):
+            return False
+
+        try:
+            payload = torch.load(cache_path, map_location='cpu')
+            cache_meta = payload.get('meta', {})
+            cache_embeddings = payload.get('embeddings')
+
+            if cache_embeddings is None:
+                return False
+
+            for k, v in expected_meta.items():
+                if cache_meta.get(k) != v:
+                    return False
+
+            if cache_embeddings.shape[0] != expected_meta['rows']:
+                return False
+
+            self.drug_embeddings = cache_embeddings
+            print(f"Loaded embeddings cache: {cache_path}")
+            print(f"Cached embeddings shape: {tuple(self.drug_embeddings.shape)}")
+            return True
+        except Exception as e:
+            print(f"Failed to load embedding cache ({cache_path}): {e}")
+            return False
+
+    def _save_embedding_cache(self, cache_path, meta):
+        if self.drug_embeddings is None:
+            return
+
+        try:
+            torch.save({'meta': meta, 'embeddings': self.drug_embeddings.cpu()}, cache_path)
+            print(f"Saved embeddings cache: {cache_path}")
+        except Exception as e:
+            print(f"Failed to save embedding cache: {e}")
+
+    def _build_drug_embeddings(self, cache_path=None, cache_meta=None):
+        if self.data_final is None or self.phobert_model is None:
+            return
+
+        try:
+            print("Building PhoBERT embeddings for official dataset...")
+            texts = [self._build_search_text(row) for _, row in self.data_final.iterrows()]
+            self.drug_embeddings = self._encode_texts(texts, batch_size=32, max_length=self.max_length)
+            print(f"Built embeddings shape: {tuple(self.drug_embeddings.shape)}")
+
+            if cache_path and cache_meta:
+                self._save_embedding_cache(cache_path, cache_meta)
+        except Exception as e:
+            print(f"Failed to build embeddings: {e}")
+            self.drug_embeddings = None
     
     def load_models(self):
         try:
-            # Đường dẫn chính xác tới file mô hình
-            model_path = r"D:\OU\DoAn\DrugRecommandation\Web\models\drug_recommendation_model.pkl"
-            fallback_path = r"D:\OU\DoAn\DrugRecommandation\Modeling\final_dataset.csv"
-            
-            print(f"Trying to load model from: {os.path.abspath(model_path)}")
-            
-            if os.path.exists(model_path):
-                print("Loading trained model...")
-                with open(model_path, 'rb') as f:
-                    self.model_package = pickle.load(f)
-                
-                # Thêm hàm classify_drug_type vào model package nếu chưa có
-                if 'classify_drug_type' not in self.model_package:
-                    self.model_package['classify_drug_type'] = classify_drug_type
-                
-                self.data_final = self.model_package['data_final']
-                print(f"Loaded ML model with {len(self.data_final)} drugs")
-                print(f"Model info: {self.model_package.get('training_info', {})}")
-                
-            elif os.path.exists(fallback_path):
-                print("Loading dataset without model...")
-                self.data_final = pd.read_csv(fallback_path, encoding='utf-8')
-                print(f"Loaded dataset: {len(self.data_final)} drugs")
-                
-            else:
-                print("Loading final_dataset.csv from current directory...")
-                current_dataset = "final_dataset.csv"
-                if os.path.exists(current_dataset):
-                    self.data_final = pd.read_csv(current_dataset, encoding='utf-8')
-                    print(f"Loaded current dataset with {len(self.data_final)} drugs")
-                else:
-                    raise FileNotFoundError("No dataset found")
+            web_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.abspath(os.path.join(web_dir, ".."))
+
+            official_dataset_path = os.getenv(
+                "DRUG_DATASET_PATH",
+                os.path.join(project_root, "preprocessData_All", "merged_drug_data_mapped(2).csv")
+            )
+            official_model_path = os.getenv(
+                "DRUG_PHOBERT_PATH",
+                os.path.join(project_root, "Modeling", "phobert_finetuned(3)_latest.pth")
+            )
+
+            print(f"Loading official dataset: {official_dataset_path}")
+            if not os.path.exists(official_dataset_path):
+                raise FileNotFoundError(f"Official dataset not found: {official_dataset_path}")
+
+            self.data_final = pd.read_csv(official_dataset_path, encoding='utf-8')
+            self._detect_columns()
+            self._deduplicate_dataset_for_serving()
+            print(f"Loaded official dataset: {len(self.data_final)} drugs")
+
+            # Load official PhoBERT checkpoint + precompute embeddings
+            self._load_phobert_model(official_model_path)
+            if self.phobert_model is not None:
+                cache_meta = self._build_cache_meta(official_dataset_path, official_model_path, max_length=self.max_length)
+                cache_path = self._get_cache_path(official_dataset_path, official_model_path)
+
+                if not self._try_load_embedding_cache(cache_path, cache_meta):
+                    self._build_drug_embeddings(cache_path=cache_path, cache_meta=cache_meta)
                 
         except Exception as e:
-            print(f"Error loading models: {e}")
-            # Tạo dummy data backup từ dataset thực
-            self.data_final = pd.DataFrame({
-                'ten_thuoc': ['Paracetamol: thuốc giảm đau hạ sốt', 'Aspirin: thuốc chống viêm giảm đau', 'Amoxicillin: thuốc kháng sinh'],
-                'thanh_phan': ['Paracetamol 500mg', 'Aspirin 325mg', 'Amoxicillin 500mg'],
-                'chi_dinh': ['giảm đau, hạ sốt, đau đầu', 'giảm đau, chống viêm, đau khớp', 'nhiễm trùng, viêm phổi, viêm họng'],
-                'chong_chi_dinh': ['Suy gan nặng', 'Hen suyễn, xuất huyết', 'Dị ứng penicillin'],
-                'tac_dung_phu': ['Buồn nôn, đau bụng', 'Chảy máu dạ dày', 'Tiêu chảy, nôn'],
-                'source': ['DieuTri', 'DieuTri', 'DieuTri']
-            })
-            print(f"Created backup data with {len(self.data_final)} drugs")
+            print(f"Error loading official dataset/PhoBERT: {e}")
+            self.data_final = None
+            self.tokenizer = None
+            self.phobert_model = None
+            self.drug_embeddings = None
         
         # Debug thông tin dataset
         if self.data_final is not None:
             print(f"Dataset info:")
             print(f"   Columns: {self.data_final.columns.tolist()}")
             print(f"   Shape: {self.data_final.shape}")
-            print(f"   Sample drug names: {self.data_final['ten_thuoc'].head().tolist()}")
+            print(f"   Name column: {self.name_col}")
+            print(f"   Inference max_length: {self.max_length}")
     
     def _create_symptom_mapping(self):
         return {
@@ -128,125 +500,73 @@ class EnhancedDrugRecommendationEngine:
             'viêm da': ['viêm da', 'eczema', 'dermatitis', 'da viêm', 'da bị viêm']
         }
     
-    def predict_drug_category(self, symptoms):
-        """Sử dụng mô hình đã được huấn luyện để dự đoán loại thuốc"""
-        if not self.model_package:
-            print("No trained model available, using rule-based classification")
-            return self._rule_based_classification(symptoms)
-        
-        try:
-            symptoms_clean = symptoms.lower().strip()
-            
-            # TF-IDF transform
-            tfidf_vectorizer = self.model_package['tfidf_vectorizer']
-            X_text = tfidf_vectorizer.transform([symptoms_clean])
-            
-            # Numeric features
-            safe_features = self.model_package['safe_numeric_features']
-            X_numeric = np.zeros((1, len(safe_features)))
-            
-            # Combine
-            X_combined = hstack([X_text, X_numeric])
-            
-            # Predict
-            model = self.model_package['best_model']
-            le = self.model_package['le_drug_type']
-            
-            prediction = model.predict(X_combined)[0]
-            probabilities = model.predict_proba(X_combined)[0]
-            
-            predicted_class = le.inverse_transform([prediction])[0]
-            confidence = max(probabilities)
-            
-            print(f"ML Prediction: {predicted_class} (confidence: {confidence:.3f})")
-            
-            return {
-                'predicted_class': predicted_class,
-                'confidence': confidence,
-                'method': 'ML'
-            }
-        except Exception as e:
-            print(f"ML prediction error: {e}, falling back to rule-based")
-            return self._rule_based_classification(symptoms)
-    
-    def _rule_based_classification(self, symptoms):
-        """Phân loại dựa trên quy tắc khi không có mô hình ML"""
-        symptoms_lower = symptoms.lower()
-        
-        if any(word in symptoms_lower for word in ['đau đầu', 'sốt', 'giảm đau', 'hạ sốt']):
-            return {'predicted_class': 'giảm đau hạ sốt', 'confidence': 0.8, 'method': 'rule-based'}
-        elif any(word in symptoms_lower for word in ['ho', 'cảm', 'hô hấp', 'phế quản']):
-            return {'predicted_class': 'hô hấp', 'confidence': 0.8, 'method': 'rule-based'}
-        elif any(word in symptoms_lower for word in ['nhiễm trùng', 'kháng sinh', 'viêm']):
-            return {'predicted_class': 'kháng sinh', 'confidence': 0.8, 'method': 'rule-based'}
-        elif any(word in symptoms_lower for word in ['đau bụng', 'tiêu chảy', 'dạ dày']):
-            return {'predicted_class': 'tiêu hóa', 'confidence': 0.8, 'method': 'rule-based'}
-        else:
-            return {'predicted_class': 'tổng hợp', 'confidence': 0.5, 'method': 'rule-based'}
-    
     def search_by_symptoms(self, symptoms, limit=15):
-        """Tìm thuốc với logic cải tiến dựa trên mô hình đã huấn luyện"""
+        """Tìm thuốc theo triệu chứng chỉ bằng semantic retrieval PhoBERT."""
         if self.data_final is None:
             return {'drugs': [], 'detected_symptoms': [], 'total_found': 0}
-        
-        # ML prediction hoặc rule-based
-        ml_prediction = self.predict_drug_category(symptoms)
-        
-        # Detect symptoms
-        symptoms_clean = symptoms.lower()
-        detected_symptoms = []
-        matched_keywords = set()
-        
-        for symptom, keywords in self.symptom_mapping.items():
-            for keyword in keywords:
-                if keyword in symptoms_clean:
+
+        if self.phobert_model is None or self.drug_embeddings is None:
+            print("PhoBERT model/embeddings unavailable, cannot run semantic search")
+            symptoms_clean = symptoms.lower().strip()
+            detected_symptoms = []
+            for symptom, keywords in self.symptom_mapping.items():
+                if any(keyword in symptoms_clean for keyword in keywords):
                     detected_symptoms.append({
-                        'name': symptom, 
+                        'name': symptom,
                         'category': self._get_symptom_category(symptom)
                     })
-                    matched_keywords.update(keywords)
-                    break
-        
-        # Search drugs in chi_dinh column
+
+            return {
+                'drugs': [],
+                'detected_symptoms': detected_symptoms,
+                'total_found': 0,
+                'ml_prediction': {
+                    'predicted_class': None,
+                    'confidence': None,
+                    'method': 'PhoBERT-unavailable'
+                }
+            }
+
+        return self._search_by_symptoms_phobert(symptoms, limit=limit)
+
+    def _search_by_symptoms_phobert(self, symptoms, limit=15):
+        symptoms_clean = symptoms.lower().strip()
+
+        detected_symptoms = []
+        for symptom, keywords in self.symptom_mapping.items():
+            if any(keyword in symptoms_clean for keyword in keywords):
+                detected_symptoms.append({
+                    'name': symptom,
+                    'category': self._get_symptom_category(symptom)
+                })
+
+        ml_prediction = {'predicted_class': None, 'confidence': None, 'method': 'PhoBERT-semantic'}
+
+        query_text = symptoms.strip()
+        query_emb = self._encode_texts([query_text], batch_size=1, max_length=self.max_length)
+        if query_emb is None:
+            return {'drugs': [], 'detected_symptoms': detected_symptoms, 'total_found': 0}
+
+        # cosine similarity vì embeddings đã normalize
+        sims = torch.matmul(self.drug_embeddings, query_emb[0].unsqueeze(1)).squeeze(1).numpy()
+        top_k = min(max(limit * 3, 20), len(sims))
+        top_indices = np.argpartition(-sims, top_k - 1)[:top_k]
+        top_indices = top_indices[np.argsort(-sims[top_indices])]
+
         matches = []
-        
-        for idx, row in self.data_final.iterrows():
-            if pd.notna(row['chi_dinh']):
-                indication = str(row['chi_dinh']).lower()
-                score = 0
-                matched_symptoms = []
-                
-                # Score based on keyword matching
-                for keyword in matched_keywords:
-                    if keyword in indication:
-                        score += 1
-                        matched_symptoms.append(keyword)
-                
-                # ML bonus score
-                if ml_prediction and score > 0:
-                    drug_category = self._classify_drug_from_name(row['ten_thuoc'])
-                    if ml_prediction['predicted_class'].lower() in drug_category.lower():
-                        score += 2
-                        print(f"ML bonus for {row['ten_thuoc'][:50]} - predicted: {ml_prediction['predicted_class']}, drug_cat: {drug_category}")
-                
-                # Fuzzy matching cho exact symptoms
-                for symptom_word in symptoms_clean.split():
-                    if len(symptom_word) >= 3 and symptom_word in indication:
-                        score += 0.5
-                
-                # Add to matches if score > 0
-                if score > 0:
-                    drug_info = self._get_drug_info(idx, row)
-                    drug_info['score'] = round(score, 1)
-                    drug_info['matched_symptoms'] = matched_symptoms[:3]
-                    drug_info['confidence_level'] = self._get_confidence_level(score)
-                    matches.append(drug_info)
-        
-        # Sort by score
-        matches.sort(key=lambda x: x['score'], reverse=True)
-        
-        print(f"Found {len(matches)} matches for symptoms: {symptoms}")
-        
+        for idx in top_indices:
+            score = float(sims[idx])
+            row = self.data_final.iloc[idx]
+            drug_info = self._get_drug_info(idx, row)
+            drug_info['score'] = round(score, 4)
+            drug_info['matched_symptoms'] = [s['name'] for s in detected_symptoms[:3]]
+            drug_info['confidence_level'] = 'Cao' if score >= 0.65 else ('Trung bình' if score >= 0.45 else 'Thấp')
+            matches.append(drug_info)
+
+        if matches:
+            ml_prediction['predicted_class'] = matches[0].get('drug_class')
+            ml_prediction['confidence'] = matches[0].get('score')
+
         return {
             'drugs': matches[:limit],
             'detected_symptoms': detected_symptoms,
@@ -274,49 +594,139 @@ class EnhancedDrugRecommendationEngine:
         }
         return categories.get(symptom, 'Tổng quát')
     
-    def _classify_drug_from_name(self, drug_name):
-        if self.model_package and 'classify_drug_type' in self.model_package:
-            # Sử dụng hàm phân loại đã được lưu trong mô hình hoặc từ utils
-            classify_func = self.model_package['classify_drug_type']
-            return classify_func(drug_name)
-        else:
-            # Sử dụng hàm từ utils.py
-            return classify_drug_type(drug_name)
-    
-    def _fallback_classify_drug(self, drug_name):
-        """Phân loại thuốc fallback khi không có mô hình"""
-        if pd.isna(drug_name):
-            return 'Tổng hợp'
-        
-        drug_name = str(drug_name).lower()
-        
-        if any(word in drug_name for word in ['kháng sinh', 'amoxicillin', 'azithromycin', 'nhiễm trùng']):
-            return 'Kháng sinh'
-        elif any(word in drug_name for word in ['paracetamol', 'aspirin', 'giảm đau', 'hạ sốt']):
-            return 'Giảm đau hạ sốt'
-        elif any(word in drug_name for word in ['ho', 'cough', 'hô hấp', 'broncho']):
-            return 'Hô hấp'
-        elif any(word in drug_name for word in ['dạ dày', 'tiêu hóa', 'omeprazole']):
-            return 'Tiêu hóa'
-        elif any(word in drug_name for word in ['vitamin', 'khoáng chất', 'bổ sung']):
-            return 'Vitamin và bổ sung'
-        else:
-            return 'Tổng hợp'
-    
-    def _get_confidence_level(self, score):
-        if score >= 3:
-            return 'Cao'
-        elif score >= 1.5:
-            return 'Trung bình' 
-        else:
-            return 'Thấp'
+    def _get_drug_category(self, row):
+        if self.category_col and self.category_col in row and pd.notna(row[self.category_col]):
+            return str(row[self.category_col])
+        return 'Khác'
+
+    def _extract_image_url(self, value):
+        def is_unwanted_url(url):
+            u = str(url).lower()
+            unwanted_keywords = [
+                'logo', 'static-website', 'banner', 'avatar', 'zalo',
+                'visa', 'mastercard', 'jcb', 'momo', 'napas', 'apple-pay',
+                'dmca', 'bct', 'freeship', 'search-rx', 'near-by-store',
+                'nurse', 'cod', 'blue-tick', 'topbanner', 'badg'
+            ]
+            if any(k in u for k in unwanted_keywords):
+                return True
+            if u.endswith('.svg'):
+                return True
+            return False
+
+        def score_url(url):
+            u = str(url).lower()
+            score = 0
+
+            if '/images/ecommerce/' in u or '/images/product/' in u:
+                score += 5
+            if '/digital/' in u:
+                score += 3
+            if '_1.' in u or '_1_' in u:
+                score += 1
+
+            if is_unwanted_url(u):
+                score -= 10
+
+            return score
+
+        def choose_best(candidates):
+            if not candidates:
+                return None
+            unique_candidates = []
+            seen = set()
+            for c in candidates:
+                if c and c not in seen:
+                    seen.add(c)
+                    unique_candidates.append(c)
+
+            if not unique_candidates:
+                return None
+
+            # Ưu tiên ảnh có điểm cao nhất
+            ranked = sorted(unique_candidates, key=score_url, reverse=True)
+            best = ranked[0]
+
+            # Nếu toàn bộ đều kém, vẫn tránh URL rõ ràng là logo nếu có thể
+            if is_unwanted_url(best):
+                for c in ranked:
+                    if not is_unwanted_url(c):
+                        return c
+            return best
+
+        if value is None:
+            return None
+
+        if isinstance(value, (list, tuple)):
+            candidates = []
+            for item in value:
+                image_url = self._extract_image_url(item)
+                if image_url:
+                    candidates.append(image_url)
+            return choose_best(candidates)
+
+        text = str(value).strip()
+        if not text or text.lower() == 'nan':
+            return None
+
+        if text.startswith('[') and text.endswith(']'):
+            try:
+                import ast
+                parsed = ast.literal_eval(text)
+                if isinstance(parsed, (list, tuple)):
+                    candidates = []
+                    for item in parsed:
+                        image_url = self._extract_image_url(item)
+                        if image_url:
+                            candidates.append(image_url)
+                    return choose_best(candidates)
+            except Exception:
+                pass
+
+        urls = re.findall(r'https?://[^\s\"\'\|\],]+', text)
+        if urls:
+            return choose_best(urls)
+
+        if text.startswith('http://') or text.startswith('https://'):
+            return text
+
+        return None
+
+    def _get_image_url(self, row):
+        if self.image_col and self.image_col in row and pd.notna(row[self.image_col]):
+            return self._extract_image_url(row[self.image_col])
+
+        for candidate in ('image_url', 'images', 'image'):
+            if candidate in row and pd.notna(row[candidate]):
+                image_url = self._extract_image_url(row[candidate])
+                if image_url:
+                    return image_url
+
+        return None
+
+    def _get_image_urls(self, row):
+        image_urls = []
+
+        if self.image_col and self.image_col in row and pd.notna(row[self.image_col]):
+            image_urls.extend(self._extract_image_urls(row[self.image_col]))
+
+        for candidate in ('image_url', 'images', 'image'):
+            if candidate in row and pd.notna(row[candidate]):
+                image_urls.extend(self._extract_image_urls(row[candidate]))
+
+        unique_urls = []
+        seen = set()
+        for image_url in image_urls:
+            if image_url not in seen:
+                seen.add(image_url)
+                unique_urls.append(image_url)
+
+        ranked_urls = sorted(unique_urls, key=self._score_image_url, reverse=True)
+        return ranked_urls[:5]
     
     def _get_drug_info(self, idx, row):
-        """Lấy thông tin thuốc từ final_dataset"""
-        # Parse drug name and indication
-        drug_name = str(row['ten_thuoc']) if pd.notna(row['ten_thuoc']) else f"Thuốc {idx}"
+        drug_name = str(row[self.name_col]) if pd.notna(row[self.name_col]) else f"Thuốc {idx}"
         
-        # Extract main name and description
         if ':' in drug_name:
             name_parts = drug_name.split(':', 1)
             main_name = name_parts[0].strip()
@@ -325,26 +735,43 @@ class EnhancedDrugRecommendationEngine:
             main_name = drug_name
             description = ""
         
-        # Get other information
-        ingredients = str(row['thanh_phan']) if pd.notna(row['thanh_phan']) else 'Không có thông tin'
-        indications = str(row['chi_dinh']) if pd.notna(row['chi_dinh']) else 'Không có thông tin'
-        contraindications = str(row['chong_chi_dinh']) if pd.notna(row['chong_chi_dinh']) else 'Không có thông tin'
-        side_effects = str(row['tac_dung_phu']) if pd.notna(row['tac_dung_phu']) else 'Không có thông tin'
-        source = str(row['source']) if pd.notna(row['source']) else 'Không rõ nguồn'
+        ingredients = str(row[self.ingredients_col]) if self.ingredients_col in row and pd.notna(row[self.ingredients_col]) else 'Không có thông tin'
+        indications = str(row[self.indication_col]) if self.indication_col in row and pd.notna(row[self.indication_col]) else 'Không có thông tin'
+        contraindications = str(row[self.contra_col]) if self.contra_col in row and pd.notna(row[self.contra_col]) else 'Không có thông tin'
+        side_effects = str(row[self.side_effect_col]) if self.side_effect_col in row and pd.notna(row[self.side_effect_col]) else 'Không có thông tin'
+        usage = str(row[self.usage_col]) if self.usage_col and self.usage_col in row and pd.notna(row[self.usage_col]) else 'Không có thông tin'
+        caution = str(row[self.caution_col]) if self.caution_col and self.caution_col in row and pd.notna(row[self.caution_col]) else 'Không có thông tin'
+        packing = str(row[self.packing_col]) if self.packing_col and self.packing_col in row and pd.notna(row[self.packing_col]) else 'Không có thông tin'
+        dosage_form = str(row[self.dosage_form_col]) if self.dosage_form_col and self.dosage_form_col in row and pd.notna(row[self.dosage_form_col]) else 'Không có thông tin'
+        manufacturer = str(row[self.manufacturer_col]) if self.manufacturer_col and self.manufacturer_col in row and pd.notna(row[self.manufacturer_col]) else 'Xem trên bao bì'
+        price = row[self.price_col] if self.price_col and self.price_col in row and pd.notna(row[self.price_col]) else None
+        source = str(row[self.source_col]) if self.source_col and self.source_col in row and pd.notna(row[self.source_col]) else 'Không rõ nguồn'
+
+        if price is None:
+            price_text = 'Liên hệ để biết giá'
+        else:
+            try:
+                price_text = f"{float(price):,.0f}đ".replace(',', '.')
+            except Exception:
+                price_text = str(price)
         
         # Parse to lists
         indication_list = self._parse_to_list(indications)
         ingredients_list = self._parse_to_list(ingredients)
         contraindication_list = self._parse_to_list(contraindications)
         side_effects_list = self._parse_to_list(side_effects)
+        usage_list = self._parse_to_list(usage)
+        caution_list = self._parse_to_list(caution)
         
         return {
-            'index': idx,
+            'index': int(idx),
             'name': main_name,
             'description': description,
-            'drug_class': self._classify_drug_from_name(drug_name),
-            'price': 'Liên hệ để biết giá',
-            'manufacturer': 'Xem trên bao bì',
+            'drug_class': self._get_drug_category(row),
+            'image_url': self._get_image_url(row),
+            'image_urls': self._get_image_urls(row),
+            'price': price_text,
+            'manufacturer': manufacturer,
             'source': source,
             'prescription_required': self._requires_prescription(drug_name),
             
@@ -353,6 +780,10 @@ class EnhancedDrugRecommendationEngine:
             'ingredients': ingredients,
             'contraindication': contraindications,
             'side_effects': side_effects,
+            'usage': usage,
+            'caution': caution,
+            'packing': packing,
+            'dosage_form': dosage_form,
             
             # Lists for display
             'indication_list': indication_list,
@@ -360,6 +791,8 @@ class EnhancedDrugRecommendationEngine:
             'dosage_list': ['Theo chỉ định của bác sĩ', 'Đọc kỹ hướng dẫn sử dụng'],
             'contraindication_list': contraindication_list,
             'side_effects_list': side_effects_list,
+            'usage_list': usage_list,
+            'caution_list': caution_list,
             
             # For search results
             'matched_symptoms': []
@@ -410,12 +843,73 @@ class EnhancedDrugRecommendationEngine:
         
         return {
             'total_drugs': len(self.data_final),
-            'sources': self.data_final['source'].value_counts().to_dict() if 'source' in self.data_final.columns else {},
+            'sources': self.data_final[self.source_col].value_counts().to_dict() if self.source_col and self.source_col in self.data_final.columns else {},
             'columns': self.data_final.columns.tolist(),
-            'sample_drugs': self.data_final['ten_thuoc'].head(10).tolist(),
-            'model_loaded': self.model_package is not None,
-            'training_info': self.model_package.get('training_info', {}) if self.model_package else {}
+            'sample_drugs': self.data_final[self.name_col].head(10).tolist(),
+            'model_loaded': (self.phobert_model is not None) and (self.drug_embeddings is not None)
         }
+
+app = Flask(__name__, template_folder='templates', static_folder='static')
+app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
+
+
+def _allowed_image_file(filename):
+    ext = os.path.splitext(str(filename or ''))[1].lower()
+    return ext in ALLOWED_IMAGE_EXTENSIONS
+
+
+def to_json_safe(obj):
+    """Chuyển đổi kiểu numpy/pandas sang kiểu JSON-native."""
+    if isinstance(obj, dict):
+        return {str(k): to_json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [to_json_safe(v) for v in obj]
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        return float(obj)
+    if isinstance(obj, np.bool_):
+        return bool(obj)
+    if isinstance(obj, np.ndarray):
+        return [to_json_safe(v) for v in obj.tolist()]
+
+    try:
+        if pd.isna(obj):
+            return None
+    except Exception:
+        pass
+
+    return obj
+
+
+# Decorators
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Vui lòng đăng nhập để truy cập.', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session or session.get('role') != 'admin':
+            flash('Bạn không có quyền truy cập.', 'error')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+# Khởi tạo DB + migrations
+init_database()
 
 # Khởi tạo engine
 print("Initializing Drug Recommendation Engine...")
@@ -511,8 +1005,18 @@ def index():
             'full_name': session['full_name'],
             'role': session['role']
         }
+
+    home_stats = engine.get_dataset_stats()
+    total_drugs = int(home_stats.get('total_drugs', 0))
+    source_count = len(home_stats.get('sources', {}) or {})
+    home_stats_display = {
+        'total_drugs': total_drugs,
+        'total_drugs_text': f"{total_drugs:,}".replace(',', '.'),
+        'source_count': source_count,
+        'source_count_text': f"{source_count}",
+    }
     
-    return render_template('index.html', user=user)
+    return render_template('index.html', user=user, home_stats=home_stats_display)
 
 
 
@@ -541,17 +1045,20 @@ def search():
 
         print(f"Search results: {len(results.get('drugs', []))} drugs found")
         
-        return jsonify({
+        payload = {
             'success': True,
             'symptoms': symptoms,
             'results': results,
             'timestamp': pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')
-        })
+        }
+
+        return jsonify(to_json_safe(payload))
         
     except Exception as e:
         print(f"Search error: {str(e)}")
         return jsonify({'error': f'Lỗi tìm kiếm: {str(e)}'})
-    
+
+
 @app.route('/search_history')
 @login_required
 def search_history_page():
@@ -580,14 +1087,14 @@ def search_history_page():
 @app.route('/clear_history', methods=['POST'])
 @login_required
 def clear_history():
-    """Xóa lịch sử tìm kiếm"""
+    """Xóa lịch sử phân tích"""
     try:
         user_id = session['user_id']
         deleted_count = clear_search_history(user_id)
         
         return jsonify({
             'success': True, 
-            'message': f'Đã xóa {deleted_count} lịch sử tìm kiếm'
+            'message': f'Đã xóa {deleted_count} lịch sử phân tích'
         })
     except Exception as e:
         return jsonify({
@@ -625,10 +1132,9 @@ def repeat_search(history_id):
         conn.close()
         
         if history_item:
-            # Redirect về trang chủ với symptoms đã điền sẵn
             return redirect(url_for('index', symptoms=history_item['symptoms']))
         else:
-            flash('Không tìm thấy lịch sử tìm kiếm', 'error')
+            flash('Không tìm thấy lịch sử phân tích', 'error')
             return redirect(url_for('search_history_page'))
             
     except Exception as e:
@@ -646,6 +1152,92 @@ def drug_detail(drug_id):
     except Exception as e:
         print(f"Error in drug_detail: {e}")
         return jsonify({'error': f'Lỗi tải thông tin: {str(e)}'})
+
+
+@app.route('/admin/drug/<int:drug_id>')
+@admin_required
+def admin_manual_drug_detail(drug_id):
+    try:
+        conn = get_db()
+        drug = conn.execute('''
+            SELECT id, drug_name, drug_class, ingredients, indication,
+                   dosage_form, packing, usage, caution,
+                   contraindication, side_effects, manufacturer, price, image_urls, created_at
+            FROM drugs_master
+            WHERE id = ?
+        ''', (drug_id,)).fetchone()
+        conn.close()
+
+        if not drug:
+            return jsonify({'error': 'Không tìm thấy thuốc thủ công'})
+
+        drug_name = str(drug['drug_name']) if drug['drug_name'] else f'Thuốc {drug_id}'
+        description = ''
+        if ':' in drug_name:
+            name_parts = drug_name.split(':', 1)
+            drug_name = name_parts[0].strip()
+            description = name_parts[1].strip() if len(name_parts) > 1 else ''
+
+        ingredients = str(drug['ingredients']) if drug['ingredients'] else 'Không có thông tin'
+        indications = str(drug['indication']) if drug['indication'] else 'Không có thông tin'
+        drug_class = str(drug['drug_class']) if drug['drug_class'] else 'Chưa phân loại'
+        dosage_form = str(drug['dosage_form']) if drug['dosage_form'] else 'Không có thông tin'
+        packing = str(drug['packing']) if drug['packing'] else 'Không có thông tin'
+        usage = str(drug['usage']) if drug['usage'] else 'Không có thông tin'
+        caution = str(drug['caution']) if drug['caution'] else 'Không có thông tin'
+        contraindication = str(drug['contraindication']) if drug['contraindication'] else 'Không có thông tin'
+        side_effects = str(drug['side_effects']) if drug['side_effects'] else 'Không có thông tin'
+        manufacturer = str(drug['manufacturer']) if drug['manufacturer'] else 'Thêm thủ công'
+        price_value = drug['price']
+        if price_value is None or str(price_value).strip() == '':
+            price_text = 'Liên hệ để biết giá'
+        else:
+            try:
+                price_text = f"{float(price_value):,.0f}đ".replace(',', '.')
+            except Exception:
+                price_text = str(price_value)
+
+        image_urls = []
+        raw_image_urls = drug['image_urls']
+        if raw_image_urls:
+            try:
+                parsed_urls = json.loads(raw_image_urls)
+                if isinstance(parsed_urls, list):
+                    image_urls = [str(url).strip() for url in parsed_urls if str(url).strip()][:5]
+            except Exception:
+                image_urls = []
+
+        return jsonify({
+            'index': int(drug['id']),
+            'name': drug_name,
+            'description': description,
+            'drug_class': drug_class,
+            'image_url': image_urls[0] if image_urls else None,
+            'image_urls': image_urls,
+            'price': price_text,
+            'manufacturer': manufacturer,
+            'source': 'Thủ công',
+            'prescription_required': False,
+            'indication': indications,
+            'ingredients': ingredients,
+            'contraindication': contraindication,
+            'side_effects': side_effects,
+            'usage': usage,
+            'caution': caution,
+            'packing': packing,
+            'dosage_form': dosage_form,
+            'indication_list': engine._parse_to_list(indications),
+            'ingredients_list': engine._parse_to_list(ingredients),
+            'dosage_list': ['Theo chỉ định của bác sĩ', 'Đọc kỹ hướng dẫn sử dụng'],
+            'contraindication_list': engine._parse_to_list(contraindication),
+            'side_effects_list': engine._parse_to_list(side_effects),
+            'usage_list': engine._parse_to_list(usage),
+            'caution_list': engine._parse_to_list(caution),
+            'matched_symptoms': []
+        })
+    except Exception as e:
+        print(f"Error in admin_manual_drug_detail: {e}")
+        return jsonify({'error': f'Lỗi tải thông tin thuốc thủ công: {str(e)}'})
     
 
 @app.route('/debug')
@@ -656,7 +1248,7 @@ def debug():
 @app.route('/save_drug', methods=['POST'])
 @login_required
 def save_drug_route():
-    """API lưu thuốc vào danh sách yêu thích"""
+    """Lưu thuốc vào danh sách"""
     try:
         data = request.get_json()
         drug_index = data.get('drug_index')
@@ -682,7 +1274,7 @@ def save_drug_route():
 @app.route('/remove_saved_drug', methods=['POST'])
 @login_required
 def remove_saved_drug_route():
-    """API xóa thuốc khỏi danh sách đã lưu"""
+    """Xóa thuốc khỏi danh sách đã lưu"""
     try:
         data = request.get_json()
         drug_index = data.get('drug_index')
@@ -699,7 +1291,7 @@ def remove_saved_drug_route():
 @app.route('/check_saved_drug/<int:drug_index>')
 @login_required
 def check_saved_drug(drug_index):
-    """API kiểm tra thuốc đã được lưu chưa"""
+    """Kiểm tra thuốc đã được lưu chưa"""
     try:
         user_id = session['user_id']
         is_saved = is_drug_saved(user_id, drug_index)
@@ -859,17 +1451,22 @@ def change_password_route():
 def all_drugs():
     try:
         drugs = []
+        search = request.args.get('search', '')
         
         if engine.data_final is not None:
             df = engine.data_final
-            search = request.args.get('search', '')
             page = int(request.args.get('page', 1))
             per_page = 50
+            name_col = engine.name_col
+            indication_col = engine.indication_col
+            ingredients_col = engine.ingredients_col
+            contra_col = engine.contra_col
+            side_effect_col = engine.side_effect_col
             
             # Lọc theo tìm kiếm
             if search:
-                mask = df['ten_thuoc'].str.contains(search, case=False, na=False) | \
-                       df['chi_dinh'].str.contains(search, case=False, na=False)
+                mask = df[name_col].astype(str).str.contains(search, case=False, na=False) | \
+                       df[indication_col].astype(str).str.contains(search, case=False, na=False)
                 filtered_df = df[mask]
             else:
                 filtered_df = df
@@ -881,16 +1478,17 @@ def all_drugs():
             paged_df = filtered_df.iloc[start_idx:end_idx]
 
             for idx, row in paged_df.iterrows():
-                drug_name = str(row['ten_thuoc']) if pd.notna(row['ten_thuoc']) else f"Thuốc {idx}"
+                drug_name = str(row[name_col]) if pd.notna(row[name_col]) else f"Thuốc {idx}"
                 
                 drug_info = {
                     'index': idx,  # Sử dụng index gốc từ DataFrame
                     'drug_name': drug_name,
-                    'drug_class': engine._classify_drug_from_name(drug_name),
-                    'indication': str(row['chi_dinh']) if pd.notna(row['chi_dinh']) else 'Không có thông tin',
-                    'ingredients': str(row['thanh_phan']) if pd.notna(row['thanh_phan']) else 'Không có thông tin',
-                    'contraindication': str(row['chong_chi_dinh']) if pd.notna(row['chong_chi_dinh']) else 'Không có thông tin',
-                    'side_effects': str(row['tac_dung_phu']) if pd.notna(row['tac_dung_phu']) else 'Không có thông tin',
+                    'image_url': engine._get_image_url(row),
+                    'drug_class': str(row[engine.category_col]) if engine.category_col and engine.category_col in row and pd.notna(row[engine.category_col]) else 'Khác',
+                    'indication': str(row[indication_col]) if indication_col in row and pd.notna(row[indication_col]) else 'Không có thông tin',
+                    'ingredients': str(row[ingredients_col]) if ingredients_col in row and pd.notna(row[ingredients_col]) else 'Không có thông tin',
+                    'contraindication': str(row[contra_col]) if contra_col in row and pd.notna(row[contra_col]) else 'Không có thông tin',
+                    'side_effects': str(row[side_effect_col]) if side_effect_col in row and pd.notna(row[side_effect_col]) else 'Không có thông tin',
                     'score': 0,
                     'confidence': 'medium',
                     'matched_symptoms': []
@@ -960,7 +1558,6 @@ def admin_drugs():
         end_idx = start_idx + per_page
         drugs = all_drugs[start_idx:end_idx]
         
-        # Pagination info
         pagination = {
             'page': page,
             'per_page': per_page,
@@ -983,9 +1580,9 @@ def admin_drugs():
         flash(f'Lỗi tải danh sách thuốc: {str(e)}', 'error')
         return redirect(url_for('admin_dashboard'))
 
-@app.route('/admin/drug/add', methods=['GET', 'POST'])
+@app.route('/admin/drug/add', methods=['GET', 'POST'], endpoint='add_drug')
 @admin_required
-def add_drug():
+def add_drug_route():
     """Thêm thuốc mới """
     if request.method == 'POST':
         try:
@@ -993,12 +1590,84 @@ def add_drug():
             drug_class = request.form.get('drug_class', '').strip()
             ingredients = request.form.get('ingredients', '').strip()
             indication = request.form.get('indication', '').strip()
+            dosage_form = request.form.get('dosage_form', '').strip() or None
+            packing = request.form.get('packing', '').strip() or None
+            usage = request.form.get('usage', '').strip() or None
+            caution = request.form.get('caution', '').strip() or None
+            contraindication = request.form.get('contraindication', '').strip() or None
+            side_effects = request.form.get('side_effects', '').strip() or None
+            manufacturer = request.form.get('manufacturer', '').strip() or None
+            price_raw = request.form.get('price', '').strip()
+            price = None
+
+            image_urls = []
+            for i in range(1, 6):
+                image_value = request.form.get(f'image_url_{i}', '').strip()
+                if not image_value:
+                    continue
+
+                if not re.match(r'^https?://', image_value, flags=re.IGNORECASE):
+                    flash(f'URL ảnh #{i} không hợp lệ. Vui lòng nhập link bắt đầu bằng http:// hoặc https://', 'error')
+                    return render_template('admin/drug_form.html', mode='add', user=session)
+
+                image_urls.append(image_value)
+
+            # Nhận thêm ảnh upload từ máy
+            uploaded_image_urls = []
+            upload_files = request.files.getlist('image_files')
+            upload_files = [f for f in upload_files if f and str(getattr(f, 'filename', '')).strip()]
+
+            if upload_files:
+                upload_dir = os.path.join(app.static_folder, 'uploads', 'drugs')
+                os.makedirs(upload_dir, exist_ok=True)
+
+                for upload_file in upload_files:
+                    if not _allowed_image_file(upload_file.filename):
+                        flash('Chỉ hỗ trợ ảnh định dạng JPG, JPEG, PNG, WEBP', 'error')
+                        return render_template('admin/drug_form.html', mode='add', user=session)
+
+                    safe_name = secure_filename(upload_file.filename)
+                    extension = os.path.splitext(safe_name)[1].lower()
+                    unique_name = f"{uuid.uuid4().hex}{extension}"
+                    output_path = os.path.join(upload_dir, unique_name)
+                    upload_file.save(output_path)
+
+                    static_rel = f"uploads/drugs/{unique_name}".replace('\\', '/')
+                    uploaded_image_urls.append(url_for('static', filename=static_rel))
+
+            # Ưu tiên ảnh upload trước, sau đó ảnh URL
+            merged_image_urls = list(dict.fromkeys(uploaded_image_urls + image_urls))
+            if len(merged_image_urls) > 5:
+                flash('Chỉ được tối đa 5 ảnh (gồm cả URL và ảnh tải từ máy)', 'error')
+                return render_template('admin/drug_form.html', mode='add', user=session)
+
+            if price_raw:
+                try:
+                    price_digits = re.sub(r'[^0-9]', '', price_raw)
+                    price = float(price_digits) if price_digits else None
+                except ValueError:
+                    flash('Giá tiền không hợp lệ', 'error')
+                    return render_template('admin/drug_form.html', mode='add', user=session)
             
             if not drug_name:
                 flash('Tên thuốc không được để trống', 'error')
                 return render_template('admin/drug_form.html', mode='add', user=session)
             
-            drug_id = add_drug(drug_name, drug_class, ingredients, indication)
+            drug_id = add_drug_to_master(
+                drug_name,
+                drug_class,
+                ingredients,
+                indication,
+                dosage_form=dosage_form,
+                packing=packing,
+                usage=usage,
+                caution=caution,
+                contraindication=contraindication,
+                side_effects=side_effects,
+                manufacturer=manufacturer,
+                price=price,
+                image_urls=merged_image_urls,
+            )
             flash(f'Đã thêm thuốc thành công (ID: {drug_id})', 'success')
             return redirect(url_for('admin_drugs'))
             
@@ -1023,14 +1692,12 @@ def delete_drug_route(drug_id):
 
 
 @app.route('/admin/stats')
-@admin_required  # Chỉ admin mới xem được
+@admin_required  
 def stats():
     """Trang thống kê"""
     try:
-        # Lấy thống kê cơ bản
         basic_stats = get_stats()
         
-        # Lấy thêm một số thống kê đơn giản
         conn = get_db()
         
         # Thống kê trong 7 ngày gần đây
@@ -1042,16 +1709,15 @@ def stats():
             WHERE search_time >= date('now', '-7 days')
         ''').fetchone()
         
-        # Top 5 triệu chứng phổ biến
         top_symptoms = conn.execute('''
             SELECT symptoms, COUNT(*) as count
             FROM search_logs 
             GROUP BY LOWER(symptoms)
             ORDER BY count DESC 
-            LIMIT 5
+            LIMIT 20
         ''').fetchall()
         
-        # Thống kê thuốc đã lưu
+        
         saved_stats = conn.execute('''
             SELECT 
                 COUNT(*) as total_saved,
@@ -1061,7 +1727,7 @@ def stats():
         
         conn.close()
         
-        # Chuẩn bị data đơn giản
+        
         stats_data = {
             'total_users': basic_stats['total_users'],
             'total_searches': basic_stats['total_searches'],

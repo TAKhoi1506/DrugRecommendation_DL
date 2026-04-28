@@ -105,6 +105,7 @@
                             <button onclick="showDrugDetailSafe(this)" 
                                     data-drug-index="{{ drug.id }}" 
                                     data-drug-name="{{ drug.drug_name }}"
+                                    data-drug-source="{{ drug.source }}"
                                     style="padding: 4px 8px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;"
                                     title="Xem chi tiết">
                                 <i class="fas fa-eye"></i>
@@ -269,6 +270,61 @@
     function showDrugDetailSafe(button) {
         const drugIndex = button.getAttribute('data-drug-index');
         const drugName = button.getAttribute('data-drug-name');
+        const drugSource = button.getAttribute('data-drug-source');
+
+        if (drugSource === 'manual') {
+            const modal = document.createElement('div');
+            modal.className = 'drug-detail-modal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2><i class="fas fa-pills"></i> Chi tiết thuốc: ${drugName}</h2>
+                        <span class="close-modal">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <div class="loading-detail">
+                            <i class="fas fa-spinner fa-spin"></i> Đang tải thông tin...
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            modal.querySelector('.close-modal').onclick = () => {
+                document.body.removeChild(modal);
+            };
+
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            };
+
+            fetch(`/admin/drug/${drugIndex}`)
+                .then(response => response.json())
+                .then(drug => {
+                    if (drug.error) {
+                        throw new Error(drug.error);
+                    }
+
+                    if (typeof window.displayDrugDetail === 'function') {
+                        window.displayDrugDetail(drug, modal);
+                    } else {
+                        modal.querySelector('.modal-body').innerHTML = `<div class="error"><i class="fas fa-exclamation-triangle"></i> Lỗi hiển thị chi tiết thuốc.</div>`;
+                    }
+                })
+                .catch(error => {
+                    modal.querySelector('.modal-body').innerHTML = `
+                        <div class="error">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Lỗi tải thông tin: ${error.message}
+                        </div>
+                    `;
+                });
+
+            return;
+        }
         
         if (typeof window.showDrugDetail === 'function') {
             window.showDrugDetail(parseInt(drugIndex), drugName);

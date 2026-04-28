@@ -47,7 +47,15 @@
     {% if drugs %}
         <div class="drugs-grid">
             {% for drug in drugs %}
+            {% set drug_id = drug.index if drug.index is defined else drug.id %}
             <div class="drug-card">
+                <div class="drug-image-wrap">
+                    <img class="drug-image"
+                         src="{{ drug.image_url or url_for('static', filename='images/drug-placeholder.svg') }}"
+                         alt="{{ drug.drug_name }}"
+                         loading="lazy"
+                         onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/drug-placeholder.svg') }}';">
+                </div>
                 <div class="drug-name">{{ drug.drug_name }}</div>
                 <div class="drug-class">{{ drug.drug_class }}</div>
                 
@@ -58,7 +66,7 @@
                 
                 <div class="drug-actions">
                     <button class="btn btn-primary" 
-                            data-drug-index="{{ drug.index }}" 
+                            data-drug-index="{{ drug_id }}" 
                             data-drug-name="{{ drug.drug_name }}" 
                             onclick="showDrugDetailSafe(this)">
                         <i class="fas fa-info-circle"></i> Chi tiết
@@ -66,8 +74,8 @@
                     
                     {% if user %}
                     <button class="btn btn-success" 
-                            id="save-btn-{{ drug.index }}" 
-                            data-drug-index="{{ drug.index }}" 
+                            id="save-btn-{{ drug_id }}" 
+                            data-drug-index="{{ drug_id }}" 
                             data-drug-name="{{ drug.drug_name }}" 
                             data-drug-class="{{ drug.drug_class }}"
                             onclick="saveDrugFromListSafe(this)">

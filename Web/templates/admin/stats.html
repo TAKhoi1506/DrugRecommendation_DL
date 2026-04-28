@@ -23,12 +23,12 @@
         </div>
         
         <div class="stat-card">
-            <h3><i class="fas fa-search"></i> Tổng tìm kiếm</h3>
+            <h3><i class="fas fa-search"></i> Tổng số lượt tra cứu</h3>
             <div class="stat-value">{{ stats.total_searches }}</div>
         </div>
         
         <div class="stat-card">
-            <h3><i class="fas fa-search"></i> Tìm kiếm 7 ngày qua</h3>
+            <h3><i class="fas fa-search"></i> Lượt tra cứu trong 7 ngày qua</h3>
             <div class="stat-value">{{ stats.searches_7days or 0 }}</div>
         </div>
         
@@ -60,7 +60,7 @@
 
         <!-- Search Statistics Chart -->
         <div class="chart-card">
-            <h3><i class="fas fa-search"></i> Thống kê tìm kiếm</h3>
+            <h3><i class="fas fa-search"></i> Thống kê tra cứu</h3>
             <div class="chart-container">
                 <canvas id="searchChart"></canvas>
             </div>
@@ -162,7 +162,7 @@
         warning: '#f39c12'
     };
     
-    // 1. Simple User Chart (Doughnut)
+
     const userCtx = document.getElementById('userChart').getContext('2d');
     new Chart(userCtx, {
         type: 'doughnut',
@@ -189,12 +189,12 @@
         }
     });
     
-    // 2. Simple Search Chart (Bar)
+    
     const searchCtx = document.getElementById('searchChart').getContext('2d');
     new Chart(searchCtx, {
         type: 'bar',
         data: {
-            labels: ['Tổng tìm kiếm', 'Tìm kiếm 7 ngày', 'Thuốc được lưu'],
+            labels: ['Tổng lượt tra cứu', 'Số lượt tra cứu 7 ngày qua', 'Thuốc được lưu'],
             datasets: [{
                 data: [statsData.total_searches, statsData.searches_7days, statsData.total_saved],
                 backgroundColor: [colors.primary, colors.warning, colors.success],

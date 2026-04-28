@@ -1,0 +1,108 @@
+﻿Category,Mapped Category Model,Score,Method,Ambiguous,Alt Category,Margin,Category Norm
+"Miếng dán, cao xoa, dầu",Cơ xương khớp,98.8,keyword,False,,2.6,"mieng dan, cao xoa, dau"
+"Cơ xương khớp, gút",Cơ xương khớp,85.8,keyword,False,,1.6,"co xuong khop, gut"
+"Dầu, Cao xoa bóp...",Cơ xương khớp,81.9,keyword,False,,1.3,"dau, cao xoa bop"
+"Dầu xoa bóp, dầu gió",Cơ xương khớp,81.9,keyword,False,,1.3,"dau xoa bop, dau gio"
+"Thuốc gout, cơ, xương khớp",Cơ xương khớp,78.0,keyword,False,,1.0,"thuoc gout, co, xuong khop"
+"Dầu, Cao Xoa, Miếng Dán",Cơ xương khớp,100.0,manual_exact,False,,999.0,dau cao xoa mieng dan
+Thuốc cơ xương khớp,Cơ xương khớp,100.0,manual_exact,False,,999.0,thuoc co xuong khop
+Cơ - xương - khớp,Cơ xương khớp,100.0,manual_exact,False,,999.0,co xuong khop
+Thuốc tê bôi,Cơ xương khớp,100.0,manual_exact,False,,999.0,thuoc te boi
+Cơ xương khớp,Cơ xương khớp,100.0,manual_exact,False,,999.0,co xuong khop
+"Da liễu, dị ứng",Da liễu & dị ứng,98.8,keyword,False,,2.6,"da lieu, di ung"
+Dị ứng/Miễn dịch,Da liễu & dị ứng,81.9,keyword,False,,1.3,di ung/mien dich
+Thuốc dùng ngoài,Da liễu & dị ứng,100.0,manual_exact,False,,999.0,thuoc dung ngoai
+Thuốc chống dị ứng ( kháng histamin),Da liễu & dị ứng,100.0,manual_exact,False,,999.0,thuoc chong di ung khang histamin
+Thuốc da liễu,Da liễu & dị ứng,100.0,manual_exact,False,,999.0,thuoc da lieu
+Thuốc kháng dị ứng,Da liễu & dị ứng,100.0,manual_exact,False,,999.0,thuoc khang di ung
+Thuốc dị ứng,Da liễu & dị ứng,100.0,manual_exact,False,,999.0,thuoc di ung
+Kháng dị ứng,Da liễu & dị ứng,100.0,manual_exact,False,,999.0,khang di ung
+Da liễu,Da liễu & dị ứng,100.0,manual_exact,False,,999.0,da lieu
+Sản phẩm trị mụn,Da liễu & dị ứng,100.0,manual_exact,False,,999.0,san pham tri mun
+"Thuốc kháng viêm, giảm đau & hạ sốt",Giảm đau & Hạ sốt,94.4,keyword,True,Kháng sinh & Kháng viêm,0.7,"thuoc khang viem, giam dau & ha sot"
+"Giảm đau, hạ sốt",Giảm đau & Hạ sốt,100.0,keyword,False,,3.6,"giam dau, ha sot"
+"Thuốc giảm đau, hạ sốt, kháng viêm",Giảm đau & Hạ sốt,100.0,keyword,False,Kháng sinh & Kháng viêm,2.3,"thuoc giam dau, ha sot, khang viem"
+"Thuốc giảm đau, hạ sốt",Giảm đau & Hạ sốt,100.0,keyword,False,,3.6,"thuoc giam dau, ha sot"
+Giảm đau/Hạ sốt,Giảm đau & Hạ sốt,100.0,keyword,False,,3.6,giam dau/ha sot
+"Giảm đau, hạ sốt, kháng viêm",Giảm đau & Hạ sốt,100.0,manual_exact,False,,999.0,giam dau ha sot khang viem
+"Thuốc cảm lạnh, ho",Hô hấp,100.0,keyword,False,,3.9,"thuoc cam lanh, ho"
+Hô hấp,Hô hấp,100.0,manual_exact,False,,999.0,ho hap
+Thuốc Hô Hấp,Hô hấp,100.0,manual_exact,False,,999.0,thuoc ho hap
+Hệ hô hấp,Hô hấp,100.0,manual_exact,False,,999.0,he ho hap
+Thuốc cảm lạnh,Hô hấp,100.0,manual_exact,False,,999.0,thuoc cam lanh
+Thuốc hô hấp,Hô hấp,100.0,manual_exact,False,,999.0,thuoc ho hap
+Thuốc cấp cứu và giải độc,Khác,100.0,manual_exact,False,,999.0,thuoc cap cuu va giai doc
+Thuốc cầm máu,Khác,100.0,manual_exact,False,,999.0,thuoc cam mau
+Thuốc đông y,Khác,100.0,manual_exact,False,,999.0,thuoc dong y
+Thuốc khác,Khác,100.0,manual_exact,False,,999.0,thuoc khac
+Thuốc giảm cân,Khác,100.0,manual_exact,False,,999.0,thuoc giam can
+Khác,Khác,100.0,manual_exact,False,,999.0,khac
+"Thuốc gây mê, gây tê",Khác,0.0,other,False,,0.0,"thuoc gay me, gay te"
+Thuốc mọc tóc,Khác,0.0,other,False,,0.0,thuoc moc toc
+"Thuốc tiêm, dịch truyền",Khác,0.0,other,False,,0.0,"thuoc tiem, dich truyen"
+Thuốc tiêm chích & dịch truyền,Khác,0.0,other,False,,0.0,thuoc tiem chich & dich truyen
+Thuốc kháng viêm,Kháng sinh & Kháng viêm,100.0,keyword,False,,2.9,thuoc khang viem
+"Kháng sinh, kháng nấm",Kháng sinh & Kháng viêm,98.8,keyword,False,,2.6,"khang sinh, khang nam"
+Thuốc kháng Virus,Kháng sinh & Kháng viêm,100.0,manual_exact,False,,999.0,thuoc khang virus
+"Thuốc kháng sinh, Kháng nấm",Kháng sinh & Kháng viêm,100.0,manual_exact,False,,999.0,thuoc khang sinh khang nam
+Thuốc điều hòa miễn dịch,Kháng sinh & Kháng viêm,100.0,manual_exact,False,,999.0,thuoc dieu hoa mien dich
+"Thuốc kháng sinh, kháng nấm",Kháng sinh & Kháng viêm,100.0,manual_exact,False,,999.0,thuoc khang sinh khang nam
+Thuốc kháng sinh,Kháng sinh & Kháng viêm,100.0,manual_exact,False,,999.0,thuoc khang sinh
+Viêm nhiễm,Kháng sinh & Kháng viêm,100.0,manual_exact,False,,999.0,viem nhiem
+Kháng sinh,Kháng sinh & Kháng viêm,100.0,manual_exact,False,,999.0,khang sinh
+Thuốc cường dương,Nam giới,100.0,manual_exact,False,,999.0,thuoc cuong duong
+Thuốc dành cho nam,Nam giới,100.0,manual_exact,False,,999.0,thuoc danh cho nam
+Thuốc cho nam giới,Nam giới,100.0,manual_exact,False,,999.0,thuoc cho nam gioi
+"Thuốc Hocmon, Nội tiết tố",Phụ nữ & Sản phụ khoa,100.0,keyword,False,,3.9,"thuoc hocmon, noi tiet to"
+Thuốc ngừa thai,Phụ nữ & Sản phụ khoa,100.0,manual_exact,False,,999.0,thuoc ngua thai
+Thuốc phụ khoa,Phụ nữ & Sản phụ khoa,100.0,manual_exact,False,,999.0,thuoc phu khoa
+Thuốc dành cho phụ nữ,Phụ nữ & Sản phụ khoa,100.0,manual_exact,False,,999.0,thuoc danh cho phu nu
+Thuốc dành cho nữ,Phụ nữ & Sản phụ khoa,100.0,manual_exact,False,,999.0,thuoc danh cho nu
+Nội tiết,Phụ nữ & Sản phụ khoa,100.0,manual_exact,False,,999.0,noi tiet
+Dung dịch vệ sinh phụ nữ,Phụ nữ & Sản phụ khoa,100.0,manual_exact,False,,999.0,dung dich ve sinh phu nu
+"Mắt, tai mũi họng","Tai, mắt, mũi, họng",100.0,manual_exact,False,,999.0,mat tai mui hong
+Thuốc Mắt/Tai/Mũi,"Tai, mắt, mũi, họng",100.0,manual_exact,False,,999.0,thuoc mat tai mui
+"Thuốc Mắt, Tai, Mũi, Họng","Tai, mắt, mũi, họng",100.0,manual_exact,False,,999.0,thuoc mat tai mui hong
+Thuốc nhỏ mắt,"Tai, mắt, mũi, họng",100.0,manual_exact,False,,999.0,thuoc nho mat
+Xịt mũi,"Tai, mắt, mũi, họng",100.0,manual_exact,False,,999.0,xit mui
+Mắt/Tai/Mũi/Họng,"Tai, mắt, mũi, họng",100.0,manual_exact,False,,999.0,mattai mui hong
+"Thuốc giải độc, khử độc và hỗ trợ cai nghiện",Thần kinh & Não bộ,75.9,keyword,True,Hô hấp,0.3,"thuoc giai doc, khu doc va ho tro cai nghien"
+"Thần kinh, não bộ",Thần kinh & Não bộ,98.8,keyword,False,,2.6,"than kinh, nao bo"
+Thuốc hướng thần & Cai nghiện,Thần kinh & Não bộ,100.0,manual_exact,False,,999.0,thuoc huong than cai nghien
+Thuốc thần kinh,Thần kinh & Não bộ,100.0,manual_exact,False,,999.0,thuoc than kinh
+Thuốc chống say xe,Thần kinh & Não bộ,100.0,manual_exact,False,,999.0,thuoc chong say xe
+Thuốc hệ thần kinh,Thần kinh & Não bộ,100.0,manual_exact,False,,999.0,thuoc he than kinh
+Thần kinh/Tâm thần,Thần kinh & Não bộ,100.0,manual_exact,False,,999.0,than kinh tam than
+Thuốc hướng thần & Cai nghiện | Thuốc giãn mạch,Tim mạch & huyết áp,87.1,keyword,True,Thần kinh & Não bộ,0.3,thuoc huong than & cai nghien thuoc gian mach
+"Thuốc tim mạch, huyết áp",Tim mạch & huyết áp,100.0,keyword,False,,4.2,"thuoc tim mach, huyet ap"
+Thuốc giãn mạch,Tim mạch & huyết áp,100.0,manual_exact,False,,999.0,thuoc gian mach
+Thuốc tim mạch & Huyết áp,Tim mạch & huyết áp,100.0,manual_exact,False,,999.0,thuoc tim mach huyet ap
+Thuốc tác dụng đối với máu,Tim mạch & huyết áp,100.0,manual_exact,False,,999.0,thuoc tac dung doi voi mau
+"Tim mạch, tiểu đường, mỡ máu",Tim mạch & huyết áp,100.0,manual_exact,False,,999.0,tim mach tieu duong mo mau
+Thuốc tim mạch & máu,Tim mạch & huyết áp,100.0,manual_exact,False,,999.0,thuoc tim mach mau
+Tim mạch,Tim mạch & huyết áp,100.0,manual_exact,False,,999.0,tim mach
+Máu,Tim mạch & huyết áp,100.0,manual_exact,False,,999.0,mau
+"Thuốc trị viêm gan B,C & HIV",Tiêu hóa & gan mật,98.8,keyword,False,,2.6,"thuoc tri viem gan b,c & hiv"
+"Tiêu hóa, gan mật",Tiêu hóa & gan mật,100.0,manual_exact,False,,999.0,tieu hoa gan mat
+"Thuốc Tiêu Hóa, gan mật",Tiêu hóa & gan mật,100.0,manual_exact,False,,999.0,thuoc tieu hoa gan mat
+Thuốc trĩ,Tiêu hóa & gan mật,100.0,manual_exact,False,,999.0,thuoc tri
+Thuốc tiêu hóa,Tiêu hóa & gan mật,100.0,manual_exact,False,,999.0,thuoc tieu hoa
+Thuốc tiêu hoá & gan mật,Tiêu hóa & gan mật,100.0,manual_exact,False,,999.0,thuoc tieu hoa gan mat
+Tiêu hóa,Tiêu hóa & gan mật,100.0,manual_exact,False,,999.0,tieu hoa
+"Tiết niệu, sinh dục",Tiết niệu & Sinh dục,98.8,keyword,False,,2.6,"tiet nieu, sinh duc"
+Tiết niệu,Tiết niệu & Sinh dục,81.9,keyword,False,,1.3,tiet nieu
+Thuốc đường tiết niệu,Tiết niệu & Sinh dục,100.0,manual_exact,False,,999.0,thuoc duong tiet nieu
+Thuốc tiết niệu - sinh dục,Tiết niệu & Sinh dục,100.0,manual_exact,False,,999.0,thuoc tiet nieu sinh duc
+Thuốc tiết niệu,Tiết niệu & Sinh dục,100.0,manual_exact,False,,999.0,thuoc tiet nieu
+Thuốc tiểu đường,Tiểu đường,100.0,manual_exact,False,,999.0,thuoc tieu duong
+Thuốc trị tiểu đường,Tiểu đường,100.0,manual_exact,False,,999.0,thuoc tri tieu duong
+Thuốc chống thải ghép,Ung thư,100.0,manual_exact,False,,999.0,thuoc chong thai ghep
+Thuốc ung thư,Ung thư,100.0,manual_exact,False,,999.0,thuoc ung thu
+Ung thư,Ung thư,100.0,manual_exact,False,,999.0,ung thu
+"Thuốc trị ung thư, u bướu",Ung thư,99.0,rule,False,,999.0,"thuoc tri ung thu, u buou"
+Vitamin & Khoáng chất,Vitamin & Khoáng chất,94.9,keyword,False,,2.3,vitamin & khoang chat
+Thuốc bổ & vitamin,Vitamin & Khoáng chất,94.9,keyword,False,,2.3,thuoc bo & vitamin
+Thuốc bổ và vitamin,Vitamin & Khoáng chất,100.0,manual_exact,False,,999.0,thuoc bo va vitamin
+Thuốc bổ - Vitamin - Khoáng chất,Vitamin & Khoáng chất,100.0,manual_exact,False,,999.0,thuoc bo vitamin khoang chat
+Vitamin khoáng chất,Vitamin & Khoáng chất,100.0,manual_exact,False,,999.0,vitamin khoang chat
+Vitamin/Khoáng chất,Vitamin & Khoáng chất,100.0,manual_exact,False,,999.0,vitamin khoang chat

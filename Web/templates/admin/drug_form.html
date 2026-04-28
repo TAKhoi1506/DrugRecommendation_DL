@@ -7,7 +7,6 @@
 {% block extra_css %}
 {{ super() }}
 <style>
-/* Flash Messages Styles */
 .alerts {
     margin-bottom: 20px;
 }
@@ -52,10 +51,10 @@
     font-size: 1.2em;
 }
 
-.alert-success i:before { content: '\f058'; } /* fa-check-circle */
-.alert-error i:before { content: '\f071'; } /* fa-exclamation-triangle */
-.alert-warning i:before { content: '\f06a'; } /* fa-exclamation-circle */
-.alert-info i:before { content: '\f05a'; } /* fa-info-circle */
+.alert-success i:before { content: '\f058'; }
+.alert-error i:before { content: '\f071'; }
+.alert-warning i:before { content: '\f06a'; }
+.alert-info i:before { content: '\f05a'; }
 
 @keyframes slideInDown {
     from {
@@ -68,18 +67,17 @@
     }
 }
 
-/* Form Container */
 .form-container {
-    max-width: 800px;
-    margin: 100px auto;
-    padding: 20px;
+    max-width: 1280px;
+    margin: 68px auto 44px;
+    padding: 12px 14px;
 }
 
 .form-header {
     background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
     color: white;
-    padding: 25px;
-    border-radius: 15px 15px 0 0;
+    padding: 22px 32px;
+    border-radius: 18px 18px 0 0;
     text-align: center;
     margin-bottom: 0;
 }
@@ -91,27 +89,80 @@
 
 .form-content {
     background: white;
-    padding: 30px;
-    border-radius: 0 0 15px 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    padding: 24px 30px 30px;
+    border-radius: 0 0 18px 18px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.10);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px 14px;
+}
+
+@media (max-width: 1100px) {
+    .form-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .form-container {
+        padding: 12px;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.form-header,
+.form-content {
+    transition: padding 0.2s ease;
+}
+
+@media (max-width: 768px) {
+    .form-header,
+    .form-content {
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+}
+
+.form-section-title {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #e9ecef;
+    color: #2c3e50;
+    font-size: 1em;
+    font-weight: 600;
+}
+
+.full-width {
+    grid-column: 1 / -1;
+}
+
+.half-width {
+    grid-column: span 1;
 }
 
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 0;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     font-weight: 500;
     color: #2c3e50;
 }
 
 .form-control {
     width: 100%;
-    padding: 12px;
+    padding: 9px 11px;
     border: 2px solid #ddd;
-    border-radius: 8px;
+    border-radius: 10px;
     box-sizing: border-box;
     font-size: 14px;
     transition: border-color 0.3s ease;
@@ -126,8 +177,8 @@
 .form-actions {
     display: flex;
     gap: 15px;
-    margin-top: 30px;
-    padding-top: 20px;
+    margin-top: 20px;
+    padding-top: 16px;
     border-top: 1px solid #e9ecef;
 }
 
@@ -167,7 +218,7 @@
     color: white;
     text-decoration: none;
 }
-</style>
+    </style>
 {% endblock %}
 
 {% block content %}
@@ -182,13 +233,12 @@
         </h1>
         <p>{% if mode == 'add' %}Nhập thông tin thuốc mới vào hệ thống{% else %}Cập nhật thông tin thuốc{% endif %}</p>
     </div>
-    
-    <!-- Flash Messages với data attributes -->
+
     <div class="alerts">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}" 
+                    <div class="alert alert-{{ category }}"
                          data-alert-type="{{ category }}"
                          data-message="{{ message|e }}">
                         <i class="fas" aria-hidden="true"></i>
@@ -200,90 +250,138 @@
     </div>
 
     <div class="form-content">
-        <form method="POST">
-            <div class="form-group">
-                <label for="drug_name">
-                    <i class="fas fa-pills"></i> Tên thuốc *
-                </label>
-                <input type="text" 
-                       id="drug_name"
-                       name="drug_name" 
-                       class="form-control"
-                       value="{{ drug.drug_name if drug else '' }}" 
-                       required
-                       placeholder="VD: Paracetamol 500mg"
-                       data-field="drug_name">
-            </div>
+        <form method="POST" enctype="multipart/form-data">
+            <div class="form-grid">
+                <div class="form-section-title"><i class="fas fa-file-medical"></i> Thông tin cơ bản</div>
 
-            <div class="form-group">
-                <label for="drug_class">
-                    <i class="fas fa-tags"></i> Phân loại
-                </label>
-                <input type="text" 
-                       id="drug_class"
-                       name="drug_class" 
-                       class="form-control"
-                       value="{{ drug.drug_class if drug else '' }}"
-                       placeholder="VD: Giảm đau hạ sốt"
-                       data-field="drug_class">
-            </div>
+                <div class="form-group half-width">
+                    <label for="drug_name"><i class="fas fa-pills"></i> Tên thuốc *</label>
+                    <input type="text" id="drug_name" name="drug_name" class="form-control"
+                           value="{{ drug.drug_name if drug else '' }}" required
+                           placeholder="VD: Paracetamol 500mg" data-field="drug_name">
+                </div>
 
-            <div class="form-group">
-                <label for="ingredients">
-                    <i class="fas fa-flask"></i> Thành phần
-                </label>
-                <textarea id="ingredients"
-                          name="ingredients" 
-                          rows="3"
-                          class="form-control"
-                          placeholder="Nhập thành phần chính của thuốc"
-                          data-field="ingredients">{{ drug.ingredients if drug else '' }}</textarea>
-            </div>
+                <div class="form-group half-width">
+                    <label for="drug_class"><i class="fas fa-tags"></i> Phân loại</label>
+                    <input type="text" id="drug_class" name="drug_class" class="form-control"
+                           value="{{ drug.drug_class if drug else '' }}"
+                           placeholder="VD: Giảm đau hạ sốt" data-field="drug_class">
+                </div>
 
-            <div class="form-group">
-                <label for="indication">
-                    <i class="fas fa-info-circle"></i> Chỉ định
-                </label>
-                <textarea id="indication"
-                          name="indication" 
-                          rows="4"
-                          class="form-control"
-                          placeholder="Nhập các chỉ định sử dụng thuốc"
-                          data-field="indication">{{ drug.indication if drug else '' }}</textarea>
-            </div>
+                <div class="form-group half-width">
+                    <label for="dosage_form"><i class="fas fa-capsules"></i> Dạng bào chế</label>
+                    <input type="text" id="dosage_form" name="dosage_form" class="form-control"
+                           value="{{ drug.dosage_form if drug else '' }}"
+                           placeholder="VD: Viên nén, viên nang, siro" data-field="dosage_form">
+                </div>
 
-            <div class="form-group">
-                <label for="contraindication">
-                    <i class="fas fa-exclamation-triangle"></i> Chống chỉ định
-                </label>
-                <textarea id="contraindication"
-                          name="contraindication" 
-                          rows="3"
-                          class="form-control"
-                          placeholder="Nhập các trường hợp chống chỉ định"
-                          data-field="contraindication">{{ drug.contraindication if drug else '' }}</textarea>
-            </div>
+                <div class="form-group half-width">
+                    <label for="packing"><i class="fas fa-box"></i> Quy cách đóng gói</label>
+                    <input type="text" id="packing" name="packing" class="form-control"
+                           value="{{ drug.packing if drug else '' }}"
+                           placeholder="VD: Hộp 3 vỉ x 10 viên" data-field="packing">
+                </div>
 
-            <div class="form-group">
-                <label for="side_effects">
-                    <i class="fas fa-exclamation-circle"></i> Tác dụng phụ
-                </label>
-                <textarea id="side_effects"
-                          name="side_effects" 
-                          rows="3"
-                          class="form-control"
-                          placeholder="Nhập các tác dụng phụ có thể gặp"
-                          data-field="side_effects">{{ drug.side_effects if drug else '' }}</textarea>
+                <div class="form-group half-width">
+                    <label for="manufacturer"><i class="fas fa-industry"></i> Nhà sản xuất</label>
+                    <input type="text" id="manufacturer" name="manufacturer" class="form-control"
+                           value="{{ drug.manufacturer if drug else '' }}"
+                           placeholder="VD: Abbott / DHG / Traphaco" data-field="manufacturer">
+                </div>
+
+                <div class="form-group half-width">
+                    <label for="price"><i class="fas fa-money-bill-wave"></i> Giá bán</label>
+                    <input type="text" id="price" name="price" class="form-control"
+                           value="{{ drug.price if drug else '' }}"
+                           placeholder="VD: 120000" data-field="price">
+                </div>
+
+                <div class="form-section-title"><i class="fas fa-images"></i> Hình ảnh thuốc (tối đa 5 ảnh URL)</div>
+
+                <div class="form-group full-width">
+                    <label for="image_files"><i class="fas fa-upload"></i> Tải ảnh từ máy (có thể chọn nhiều ảnh)</label>
+                    <input type="file" id="image_files" name="image_files" class="form-control"
+                           accept="image/png,image/jpeg,image/webp" multiple>
+                    <small style="display:block; margin-top:6px; color:#6c757d;">Hỗ trợ JPG, JPEG, PNG, WEBP. Tổng số ảnh (upload + URL) tối đa 5.</small>
+                </div>
+
+                <div class="form-group half-width">
+                    <label for="image_url_1"><i class="fas fa-image"></i> Ảnh 1</label>
+                    <input type="text" id="image_url_1" name="image_url_1" class="form-control"
+                           placeholder="https://..." data-field="image_url_1">
+                </div>
+
+                <div class="form-group half-width">
+                    <label for="image_url_2"><i class="fas fa-image"></i> Ảnh 2</label>
+                    <input type="text" id="image_url_2" name="image_url_2" class="form-control"
+                           placeholder="https://..." data-field="image_url_2">
+                </div>
+
+                <div class="form-group half-width">
+                    <label for="image_url_3"><i class="fas fa-image"></i> Ảnh 3</label>
+                    <input type="text" id="image_url_3" name="image_url_3" class="form-control"
+                           placeholder="https://..." data-field="image_url_3">
+                </div>
+
+                <div class="form-group half-width">
+                    <label for="image_url_4"><i class="fas fa-image"></i> Ảnh 4</label>
+                    <input type="text" id="image_url_4" name="image_url_4" class="form-control"
+                           placeholder="https://..." data-field="image_url_4">
+                </div>
+
+                <div class="form-group half-width">
+                    <label for="image_url_5"><i class="fas fa-image"></i> Ảnh 5</label>
+                    <input type="text" id="image_url_5" name="image_url_5" class="form-control"
+                           placeholder="https://..." data-field="image_url_5">
+                </div>
+
+                <div class="form-section-title"><i class="fas fa-notes-medical"></i> Mô tả sử dụng</div>
+
+                <div class="form-group full-width">
+                    <label for="ingredients"><i class="fas fa-flask"></i> Thành phần</label>
+                    <textarea id="ingredients" name="ingredients" rows="3" class="form-control"
+                              placeholder="Nhập thành phần chính của thuốc" data-field="ingredients">{{ drug.ingredients if drug else '' }}</textarea>
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="indication"><i class="fas fa-info-circle"></i> Chỉ định / Công dụng</label>
+                    <textarea id="indication" name="indication" rows="4" class="form-control"
+                              placeholder="Nhập chỉ định, công dụng, nhóm bệnh phù hợp" data-field="indication">{{ drug.indication if drug else '' }}</textarea>
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="usage"><i class="fas fa-hand-holding-medical"></i> Cách sử dụng</label>
+                    <textarea id="usage" name="usage" rows="3" class="form-control"
+                              placeholder="Nhập cách dùng, liều dùng, thời điểm sử dụng" data-field="usage">{{ drug.usage if drug else '' }}</textarea>
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="caution"><i class="fas fa-exclamation-circle"></i> Lưu ý</label>
+                    <textarea id="caution" name="caution" rows="3" class="form-control"
+                              placeholder="Nhập các lưu ý, cảnh báo khi sử dụng" data-field="caution">{{ drug.caution if drug else '' }}</textarea>
+                </div>
+
+                <div class="form-section-title"><i class="fas fa-shield-alt"></i> An toàn sử dụng</div>
+
+                <div class="form-group full-width">
+                    <label for="contraindication"><i class="fas fa-exclamation-triangle"></i> Chống chỉ định</label>
+                    <textarea id="contraindication" name="contraindication" rows="3" class="form-control"
+                              placeholder="Nhập các trường hợp chống chỉ định" data-field="contraindication">{{ drug.contraindication if drug else '' }}</textarea>
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="side_effects"><i class="fas fa-exclamation-circle"></i> Tác dụng phụ</label>
+                    <textarea id="side_effects" name="side_effects" rows="3" class="form-control"
+                              placeholder="Nhập các tác dụng phụ có thể gặp" data-field="side_effects">{{ drug.side_effects if drug else '' }}</textarea>
+                </div>
             </div>
 
             <div class="form-actions">
                 <button type="submit" class="btn btn-success" data-action="submit">
-                    <i class="fas fa-save"></i> 
+                    <i class="fas fa-save"></i>
                     {% if mode == 'add' %}Thêm thuốc{% else %}Cập nhật{% endif %}
                 </button>
-                <a href="{{ url_for('admin_drugs') }}" 
-                   class="btn btn-secondary"
-                   data-action="cancel">
+                <a href="{{ url_for('admin_drugs') }}" class="btn btn-secondary" data-action="cancel">
                     <i class="fas fa-arrow-left"></i> Quay lại
                 </a>
             </div>

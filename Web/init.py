@@ -1,14 +1,15 @@
 import os
 import sqlite3
 import pandas as pd
+import json
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
+import re
 
-# Database path
+
 DB_PATH = os.path.join(os.path.dirname(__file__), 'database', 'simple_app.db')
 
 def init_database():
-    """Khởi tạo cơ sở dữ liệu"""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     
     conn = sqlite3.connect(DB_PATH)
@@ -48,6 +49,7 @@ def init_database():
             drug_name TEXT NOT NULL,
             drug_class TEXT,
             symptoms TEXT,
+            score REAL DEFAULT 0,
             saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             notes TEXT,
             FOREIGN KEY (user_id) REFERENCES users (id),
@@ -68,15 +70,73 @@ def init_database():
     ''')
 
     cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            title TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (session_id) REFERENCES chat_sessions (id)
+        )
+    ''')
+
+    # Backward-compatible migration
+    try:
+        columns = [row[1] for row in cursor.execute("PRAGMA table_info(saved_drugs)").fetchall()]
+        if 'score' not in columns:
+            cursor.execute('ALTER TABLE saved_drugs ADD COLUMN score REAL DEFAULT 0')
+    except Exception as e:
+        print(f"Migration warning (saved_drugs.score): {e}")
+
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS drugs_master (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             drug_name TEXT NOT NULL,
             drug_class TEXT,
             ingredients TEXT,
             indication TEXT,
+            dosage_form TEXT,
+            packing TEXT,
+            usage TEXT,
+            caution TEXT,
+            contraindication TEXT,
+            side_effects TEXT,
+            manufacturer TEXT,
+            price REAL,
+            image_urls TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    try:
+        master_columns = [row[1] for row in cursor.execute("PRAGMA table_info(drugs_master)").fetchall()]
+        extra_columns = {
+            'dosage_form': 'TEXT',
+            'packing': 'TEXT',
+            'usage': 'TEXT',
+            'caution': 'TEXT',
+            'contraindication': 'TEXT',
+            'side_effects': 'TEXT',
+            'manufacturer': 'TEXT',
+            'price': 'REAL',
+            'image_urls': 'TEXT',
+        }
+        for column_name, column_type in extra_columns.items():
+            if column_name not in master_columns:
+                cursor.execute(f'ALTER TABLE drugs_master ADD COLUMN {column_name} {column_type}')
+    except Exception as e:
+        print(f"Migration warning (drugs_master extra columns): {e}")
     
     # Tạo admin mặc định
     cursor.execute('SELECT COUNT(*) FROM users WHERE role = "admin"')
@@ -118,6 +178,43 @@ def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _extract_image_url(value):
+    if value is None:
+        return None
+
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            image_url = _extract_image_url(item)
+            if image_url:
+                return image_url
+        return None
+
+    text = str(value).strip()
+    if not text or text.lower() == 'nan':
+        return None
+
+    if text.startswith('[') and text.endswith(']'):
+        try:
+            import ast
+            parsed = ast.literal_eval(text)
+            if isinstance(parsed, (list, tuple)):
+                for item in parsed:
+                    image_url = _extract_image_url(item)
+                    if image_url:
+                        return image_url
+        except Exception:
+            pass
+
+    match = re.search(r'https?://[^\s\"\']+', text)
+    if match:
+        return match.group(0)
+
+    if text.startswith('http://') or text.startswith('https://'):
+        return text
+
+    return None
 
 def create_user(username, password, full_name):
     """Tạo user mới"""
@@ -245,14 +342,12 @@ def is_drug_saved(user_id, drug_index):
 def log_search_enhanced(user_id, symptoms, results_count, user_agent = None):
     """Ghi log tìm kiếm với thông tin chi tiết"""
     conn = get_db()
-    # Kiểm tra xem cột user_agent có tồn tại không
     try:
         conn.execute('''
             INSERT INTO search_logs (user_id, symptoms, results_count, user_agent)
             VALUES (?, ?, ?, ?)
         ''', (user_id, symptoms, results_count, user_agent))
     except sqlite3.OperationalError:
-        # Fallback nếu không có cột user_agent
         conn.execute('''
             INSERT INTO search_logs (user_id, symptoms, results_count)
             VALUES (?, ?, ?)
@@ -390,14 +485,14 @@ def get_all_drugs(search_term=None, source='both'):
     
     if search_term:
         drugs_master = conn.execute('''
-            SELECT id, drug_name, drug_class, ingredients, indication, created_at, 'manual' as source
+            SELECT id, drug_name, drug_class, ingredients, indication, image_urls, created_at, 'manual' as source
             FROM drugs_master 
             WHERE drug_name LIKE ? OR ingredients LIKE ?
             ORDER BY created_at DESC
         ''', (f'%{search_term}%', f'%{search_term}%')).fetchall()
     else:
         drugs_master = conn.execute('''
-            SELECT id, drug_name, drug_class, ingredients, indication, created_at, 'manual' as source
+            SELECT id, drug_name, drug_class, ingredients, indication, image_urls, created_at, 'manual' as source
             FROM drugs_master 
             ORDER BY created_at DESC
         ''').fetchall()
@@ -412,23 +507,39 @@ def get_all_drugs(search_term=None, source='both'):
         
         if hasattr(engine, 'data_final') and engine.data_final is not None:
             df = engine.data_final
+            name_col = 'drug_name' if 'drug_name' in df.columns else 'ten_thuoc'
+            indication_col = 'indication' if 'indication' in df.columns else 'chi_dinh'
+            ingredients_col = 'active_ingredient' if 'active_ingredient' in df.columns else 'thanh_phan'
+            category_col = getattr(engine, 'category_col', None)
+            if not category_col or category_col not in df.columns:
+                for candidate in ['category_grouped_model', 'category_grouped', 'category', 'drug_class', 'phan_loai']:
+                    if candidate in df.columns:
+                        category_col = candidate
+                        break
+            image_col = 'image_url' if 'image_url' in df.columns else ('images' if 'images' in df.columns else ('image' if 'image' in df.columns else None))
             
             # Filter by search term
             if search_term:
-                mask = df['ten_thuoc'].astype(str).str.contains(search_term, case=False, na=False) | \
-                       df['chi_dinh'].astype(str).str.contains(search_term, case=False, na=False)
+                mask = df[name_col].astype(str).str.contains(search_term, case=False, na=False) | \
+                       df[indication_col].astype(str).str.contains(search_term, case=False, na=False)
                 df = df[mask]
             
             # Convert dataset to list
             for idx, row in df.iterrows():
-                drug_name = str(row['ten_thuoc']) if pd.notna(row['ten_thuoc']) else f"Thuốc {idx}"
+                drug_name = str(row[name_col]) if pd.notna(row[name_col]) else f"Thuốc {idx}"
+                category_value = row.get(category_col) if category_col else None
+                if pd.notna(category_value) and str(category_value).strip() and str(category_value).strip().lower() != 'nan':
+                    drug_class = str(category_value).strip()
+                else:
+                    drug_class = 'Chưa phân loại'
                 
                 dataset_drugs.append({
                     'id': idx,
                     'drug_name': drug_name,
-                    'drug_class': 'Dataset',  
-                    'ingredients': str(row.get('thanh_phan', '')) if pd.notna(row.get('thanh_phan')) else None,
-                    'indication': str(row.get('chi_dinh', '')) if pd.notna(row.get('chi_dinh')) else None,
+                    'drug_class': drug_class,
+                    'ingredients': str(row.get(ingredients_col, '')) if pd.notna(row.get(ingredients_col)) else None,
+                    'indication': str(row.get(indication_col, '')) if pd.notna(row.get(indication_col)) else None,
+                    'image_url': _extract_image_url(row.get(image_col)) if image_col else None,
                     'source': 'dataset',
                     'created_at': None
                 })
@@ -447,15 +558,48 @@ def get_all_drugs(search_term=None, source='both'):
         return all_drugs
 
 
-def add_drug(drug_name, drug_class, ingredients, indication):
-    """Thêm thuốcn"""
+def add_drug(
+    drug_name,
+    drug_class,
+    ingredients,
+    indication,
+    dosage_form=None,
+    packing=None,
+    usage=None,
+    caution=None,
+    contraindication=None,
+    side_effects=None,
+    manufacturer=None,
+    price=None,
+    image_urls=None,
+):
+    """Thêm thuốc thủ công vào drugs_master"""
     conn = get_db()
     cursor = conn.cursor()
     
     cursor.execute('''
-        INSERT INTO drugs_master (drug_name, drug_class, ingredients, indication, created_at)
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-    ''', (drug_name, drug_class, ingredients, indication))
+        INSERT INTO drugs_master (
+            drug_name, drug_class, ingredients, indication,
+            dosage_form, packing, usage, caution,
+            contraindication, side_effects, manufacturer, price, image_urls,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ''', (
+        drug_name,
+        drug_class,
+        ingredients,
+        indication,
+        dosage_form,
+        packing,
+        usage,
+        caution,
+        contraindication,
+        side_effects,
+        manufacturer,
+        price,
+        json.dumps(image_urls or [], ensure_ascii=False),
+    ))
     
     drug_id = cursor.lastrowid
     conn.commit()
@@ -472,6 +616,87 @@ def delete_drug(drug_id):
     conn.commit()
     conn.close()
     return deleted_rows > 0
+
+
+def create_chat_session(user_id=None, title=None):
+    """Tạo phiên chat mới"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO chat_sessions (user_id, title)
+        VALUES (?, ?)
+    ''', (user_id, title))
+    session_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return session_id
+
+
+def touch_chat_session(session_id):
+    """Cập nhật thời gian hoạt động phiên chat"""
+    conn = get_db()
+    conn.execute('''
+        UPDATE chat_sessions
+        SET updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    ''', (session_id,))
+    conn.commit()
+    conn.close()
+
+
+def add_chat_message(session_id, role, content):
+    """Thêm tin nhắn vào phiên chat"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO chat_messages (session_id, role, content)
+        VALUES (?, ?, ?)
+    ''', (session_id, role, content))
+    message_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    touch_chat_session(session_id)
+    return message_id
+
+
+def get_chat_messages(session_id, user_id=None, limit=100):
+    """Lấy tin nhắn theo phiên chat (có kiểm tra quyền sở hữu nếu user_id được truyền)"""
+    conn = get_db()
+
+    if user_id is not None:
+        session_row = conn.execute('''
+            SELECT id FROM chat_sessions
+            WHERE id = ? AND (user_id = ? OR user_id IS NULL)
+        ''', (session_id, user_id)).fetchone()
+        if not session_row:
+            conn.close()
+            return []
+
+    messages = conn.execute('''
+        SELECT id, session_id, role, content, created_at
+        FROM chat_messages
+        WHERE session_id = ?
+        ORDER BY created_at ASC
+        LIMIT ?
+    ''', (session_id, limit)).fetchall()
+    conn.close()
+
+    return [dict(m) for m in messages]
+
+
+def get_user_chat_sessions(user_id, limit=30):
+    """Lấy danh sách phiên chat của user"""
+    conn = get_db()
+    sessions = conn.execute('''
+        SELECT id, user_id, title, created_at, updated_at
+        FROM chat_sessions
+        WHERE user_id = ?
+        ORDER BY updated_at DESC
+        LIMIT ?
+    ''', (user_id, limit)).fetchall()
+    conn.close()
+    return [dict(s) for s in sessions]
 
 # Khởi tạo khi import
 if __name__ == "__main__":

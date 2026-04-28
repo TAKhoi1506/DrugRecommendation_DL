@@ -7,6 +7,7 @@ const error = document.getElementById('error');
 
 // Global variable để lưu symptoms hiện tại
 let currentSymptoms = '';
+const PLACEHOLDER_IMAGE = '/static/images/drug-placeholder.svg';
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
@@ -21,15 +22,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500);
     }
     
-    symptomsInput.focus();
+    if (symptomsInput) {
+        symptomsInput.focus();
+    }
     
     // Event listeners
-    searchBtn.addEventListener('click', search);
-    symptomsInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            search();
-        }
-    });
+    if (searchBtn) {
+        searchBtn.addEventListener('click', search);
+    }
+
+    if (symptomsInput) {
+        symptomsInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                search();
+            }
+        });
+    }
 });
 
 // Example functions
@@ -40,6 +48,8 @@ function setExample(text) {
 
 // Main search function
 async function search() {
+    if (!symptomsInput || !searchBtn || !loading || !results || !error) return;
+
     const symptoms = symptomsInput.value.trim();
     
     if (!symptoms) {
@@ -109,8 +119,12 @@ function displayResults(data) {
         resultsHtml += '<p>Không tìm thấy thuốc phù hợp. Thử với triệu chứng khác hoặc liên hệ chuyên khoa.</p>';
     } else {
         // Hiển thị thuốc ở chế độ thu gọn với nút lưu
+        resultsHtml += `<div class="drugs-grid-results">`;
         resultsHtml += drugs.map((drug, index) => `
-            <div class="drug-card collapsed" id="drug-${index}">
+            <div class="drug-card" id="drug-${index}">
+                <div class="drug-image-wrap">
+                    <img class="drug-image" src="${drug.image_url || PLACEHOLDER_IMAGE}" alt="${drug.name}" loading="lazy" onerror="this.onerror=null;this.src=PLACEHOLDER_IMAGE;">
+                </div>
                 <!-- Header thuốc - luôn hiển thị -->
                 <div class="drug-header">
                     <div class="drug-summary">
@@ -131,63 +145,19 @@ function displayResults(data) {
                         </div>
                     </div>
                     
-                    <!-- Nút mở rộng/thu gọn và các actions -->
+                    <!-- Actions gọn: chỉ xem chi tiết đầy đủ + lưu -->
                     <div class="expand-controls">
-                        <button class="btn btn-expand" onclick="toggleDrugDetails(${index})">
-                            <i class="fas fa-chevron-down" id="expand-icon-${index}"></i>
-                            <span id="expand-text-${index}">Xem chi tiết</span>
-                        </button>
                         <button class="btn btn-detail" onclick="showDrugDetail(${drug.index}, '${drug.name.replace(/'/g, "\\'")}')">
-                            <i class="fas fa-info-circle"></i> Chi tiết đầy đủ
+                            <i class="fas fa-info-circle"></i> Xem chi tiết
                         </button>
                         <button class="btn btn-save" id="save-btn-${drug.index}" onclick="saveDrugToList(${drug.index}, '${drug.name.replace(/'/g, "\\'")}', '${drug.drug_class}', '${currentSymptoms.replace(/'/g, "\\'")}', ${drug.score || 0})">
                             <i class="fas fa-bookmark"></i> Lưu
                         </button>
                     </div>
                 </div>
-                
-                <!-- Nội dung chi tiết - ẩn ban đầu -->
-                <div class="drug-details-content" id="details-${index}" style="display: none;">
-                    <div class="drug-details">
-                        <div class="detail-section indications">
-                            <h4><i class="fas fa-info-circle"></i> Chỉ định & Công dụng</h4>
-                            <ul class="detail-list">
-                                ${formatListItems(drug.indication_list ? drug.indication_list.slice(0, 3) : ['Không có thông tin'])}
-                                ${drug.indication_list && drug.indication_list.length > 3 ? '<li class="more-info">... và nhiều công dụng khác</li>' : ''}
-                            </ul>
-                        </div>
-                        <div class="detail-section ingredients">
-                            <h4><i class="fas fa-flask"></i> Thành phần chính</h4>
-                            <ul class="detail-list">
-                                ${formatListItems(drug.ingredients_list ? drug.ingredients_list.slice(0, 2) : ['Không có thông tin'])}
-                                ${drug.ingredients_list && drug.ingredients_list.length > 2 ? '<li class="more-info">... và các thành phần khác</li>' : ''}
-                            </ul>
-                        </div>
-                        <div class="detail-section contraindications">
-                            <h4><i class="fas fa-exclamation-triangle"></i> Chống chỉ định</h4>
-                            <ul class="detail-list">
-                                ${formatListItems(drug.contraindication_list ? drug.contraindication_list.slice(0, 2) : ['Không có thông tin'])}
-                                ${drug.contraindication_list && drug.contraindication_list.length > 2 ? '<li class="more-info">... và các chống chỉ định khác</li>' : ''}
-                            </ul>
-                        </div>
-
-                        <div class="detail-section side-effects">
-                            <h4><i class="fas fa-exclamation-circle"></i> Tác dụng phụ</h4>
-                            <ul class="detail-list">
-                                ${formatListItems(drug.side_effects_list ? drug.side_effects_list.slice(0, 3) : ['Không có thông tin'])}
-                                ${drug.side_effects_list && drug.side_effects_list.length > 3 ? '<li class="more-info">... và các tác dụng phụ khác</li>' : ''}
-                            </ul>
-                        </div>
-                    </div>
-                    
-                    <div class="drug-footer">
-                        <div class="manufacturer-info">
-                            <i class="fas fa-building"></i> <strong>Nhà sản xuất:</strong> ${drug.manufacturer || 'Xem trên bao bì'}
-                        </div>
-                    </div>
-                </div>
             </div>
         `).join('');
+        resultsHtml += `</div>`;
         
         resultsHtml += `
             <div class="clinical-notes">
@@ -197,15 +167,6 @@ function displayResults(data) {
                     <p>Kiểm tra tương tác với các thuốc đang sử dụng</p>
                     <p>Điều chỉnh liều theo tuổi, cân nặng và chức năng gan, thận</p>
                     <p>Theo dõi tác dụng phụ và hiệu quả điều trị</p>
-                </div>
-                
-                <div class="view-controls">
-                    <button class="btn btn-secondary" onclick="expandAllDrugs()">
-                        <i class="fas fa-expand-arrows-alt"></i> Mở rộng tất cả
-                    </button>
-                    <button class="btn btn-secondary" onclick="collapseAllDrugs()">
-                        <i class="fas fa-compress-arrows-alt"></i> Thu gọn tất cả
-                    </button>
                 </div>
             </div>
         `;
@@ -295,66 +256,6 @@ function checkUserLoggedIn() {
     return logoutLink !== null;
 }
 
-// Toggle drug details
-function toggleDrugDetails(index) {
-    const detailsDiv = document.getElementById(`details-${index}`);
-    const expandIcon = document.getElementById(`expand-icon-${index}`);
-    const expandText = document.getElementById(`expand-text-${index}`);
-    const drugCard = document.getElementById(`drug-${index}`);
-    
-    if (detailsDiv.style.display === 'none') {
-        // Mở rộng
-        detailsDiv.style.display = 'block';
-        expandIcon.className = 'fas fa-chevron-up';
-        expandText.textContent = 'Thu gọn';
-        drugCard.classList.remove('collapsed');
-        drugCard.classList.add('expanded');
-    } else {
-        // Thu gọn
-        detailsDiv.style.display = 'none';
-        expandIcon.className = 'fas fa-chevron-down';
-        expandText.textContent = 'Xem chi tiết';
-        drugCard.classList.remove('expanded');
-        drugCard.classList.add('collapsed');
-    }
-}
-
-// Expand all drugs
-function expandAllDrugs() {
-    const drugCards = document.querySelectorAll('.drug-card');
-    drugCards.forEach((card, index) => {
-        const detailsDiv = document.getElementById(`details-${index}`);
-        const expandIcon = document.getElementById(`expand-icon-${index}`);
-        const expandText = document.getElementById(`expand-text-${index}`);
-        
-        if (detailsDiv && detailsDiv.style.display === 'none') {
-            detailsDiv.style.display = 'block';
-            expandIcon.className = 'fas fa-chevron-up';
-            expandText.textContent = 'Thu gọn';
-            card.classList.remove('collapsed');
-            card.classList.add('expanded');
-        }
-    });
-}
-
-// Collapse all drugs
-function collapseAllDrugs() {
-    const drugCards = document.querySelectorAll('.drug-card');
-    drugCards.forEach((card, index) => {
-        const detailsDiv = document.getElementById(`details-${index}`);
-        const expandIcon = document.getElementById(`expand-icon-${index}`);
-        const expandText = document.getElementById(`expand-text-${index}`);
-        
-        if (detailsDiv && detailsDiv.style.display !== 'none') {
-            detailsDiv.style.display = 'none';
-            expandIcon.className = 'fas fa-chevron-down';
-            expandText.textContent = 'Xem chi tiết';
-            card.classList.remove('expanded');
-            card.classList.add('collapsed');
-        }
-    });
-}
-
 // Drug detail modal functions
 function showDrugDetail(drugIndex, drugName) {
     // Track click nếu user đã đăng nhập
@@ -423,22 +324,135 @@ async function loadDrugDetail(drugIndex, modal) {
     }
 }
 
+function normalizeImageUrls(imageUrls) {
+    if (Array.isArray(imageUrls)) {
+        const urls = imageUrls
+            .map(url => String(url || '').trim())
+            .filter(Boolean);
+        return [...new Set(urls)].filter(Boolean).slice(0, 5);
+    }
+
+    if (typeof imageUrls === 'string' && imageUrls.trim()) {
+        return [imageUrls.trim()];
+    }
+
+    return [];
+}
+
+function buildDrugImageCarousel(drug) {
+    const imageUrls = normalizeImageUrls(drug.image_urls || drug.image_url);
+    const carouselUrls = imageUrls.length > 0 ? imageUrls : [PLACEHOLDER_IMAGE];
+    const hasMultipleImages = carouselUrls.length > 1;
+
+    const dotsHtml = hasMultipleImages ? carouselUrls.map((_, index) => `
+        <button type="button"
+                class="carousel-dot ${index === 0 ? 'active' : ''}"
+                data-carousel-dot="${index}"
+                aria-label="Xem ảnh ${index + 1}">
+        </button>
+    `).join('') : '';
+
+    return `
+        <div class="detail-image-carousel" data-drug-carousel>
+            <div class="detail-image-stage">
+                ${hasMultipleImages ? `
+                <button type="button" class="carousel-arrow carousel-prev" data-carousel-prev aria-label="Ảnh trước">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                ` : ''}
+
+                <img class="detail-image carousel-image"
+                     src="${carouselUrls[0]}"
+                     alt="${drug.name}"
+                     data-carousel-image
+                     onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}'">
+
+                ${hasMultipleImages ? `
+                <button type="button" class="carousel-arrow carousel-next" data-carousel-next aria-label="Ảnh tiếp theo">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                ` : ''}
+            </div>
+
+            ${hasMultipleImages ? `
+            <div class="carousel-meta">
+                <span class="carousel-counter" data-carousel-counter>1 / ${carouselUrls.length}</span>
+            </div>
+            <div class="carousel-dots">
+                ${dotsHtml}
+            </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+function setupDrugImageCarousel(modal, imageUrls) {
+    const carouselUrls = normalizeImageUrls(imageUrls);
+    if (carouselUrls.length <= 1) return;
+
+    const carousel = modal.querySelector('[data-drug-carousel]');
+    const imageElement = modal.querySelector('[data-carousel-image]');
+    const prevButton = modal.querySelector('[data-carousel-prev]');
+    const nextButton = modal.querySelector('[data-carousel-next]');
+    const counter = modal.querySelector('[data-carousel-counter]');
+    const dotButtons = modal.querySelectorAll('[data-carousel-dot]');
+
+    if (!carousel || !imageElement || !prevButton || !nextButton) return;
+
+    let currentIndex = 0;
+
+    const updateCarousel = () => {
+        imageElement.src = carouselUrls[currentIndex];
+        imageElement.alt = `Ảnh ${currentIndex + 1}`;
+
+        if (counter) {
+            counter.textContent = `${currentIndex + 1} / ${carouselUrls.length}`;
+        }
+
+        dotButtons.forEach((dotButton, index) => {
+            dotButton.classList.toggle('active', index === currentIndex);
+        });
+    };
+
+    prevButton.addEventListener('click', () => {
+        currentIndex = (currentIndex - 1 + carouselUrls.length) % carouselUrls.length;
+        updateCarousel();
+    });
+
+    nextButton.addEventListener('click', () => {
+        currentIndex = (currentIndex + 1) % carouselUrls.length;
+        updateCarousel();
+    });
+
+    dotButtons.forEach((dotButton, index) => {
+        dotButton.addEventListener('click', () => {
+            currentIndex = index;
+            updateCarousel();
+        });
+    });
+
+    updateCarousel();
+}
+
 function displayDrugDetail(drug, modal) {
     const modalBody = modal.querySelector('.modal-body');
     
     modalBody.innerHTML = `
         <div class="drug-detail-content">
             <div class="detail-overview">
-                <div class="drug-title">
-                    <h3>${drug.name}</h3>
-                    <div class="drug-badges">
-                        <span class="badge drug-class-badge">${drug.drug_class}</span>
-                        ${drug.prescription_required ? '<span class="badge prescription-badge">Cần đơn thuốc</span>' : ''}
-                        <span class="badge price-badge">${drug.price}</span>
+                ${buildDrugImageCarousel(drug)}
+                <div class="drug-detail-meta">
+                    <div class="drug-title">
+                        <h3>${drug.name}</h3>
+                        <div class="drug-badges">
+                            <span class="badge drug-class-badge">${drug.drug_class}</span>
+                            ${drug.prescription_required ? '<span class="badge prescription-badge">Cần đơn thuốc</span>' : ''}
+                            <span class="badge price-badge">${drug.price}</span>
+                        </div>
                     </div>
-                </div>
-                <div class="manufacturer-info">
-                    <i class="fas fa-building"></i> <strong>Nhà sản xuất:</strong> ${drug.manufacturer}
+                    <div class="manufacturer-info">
+                        <i class="fas fa-building"></i> <strong>Nhà sản xuất:</strong> ${drug.manufacturer}
+                    </div>
                 </div>
             </div>
             
@@ -455,6 +469,9 @@ function displayDrugDetail(drug, modal) {
                     </button>
                     <button class="tab-btn" data-tab="side-effects">
                         <i class="fas fa-warning"></i> Tác dụng phụ
+                    </button>
+                    <button class="tab-btn" data-tab="more-info">
+                        <i class="fas fa-notes-medical"></i> Thông tin khác
                     </button>
                 </div>
                 
@@ -495,6 +512,18 @@ function displayDrugDetail(drug, modal) {
                             <strong>Lưu ý:</strong> Nếu gặp tác dụng phụ nghiêm trọng, ngừng dùng thuốc và liên hệ bác sĩ ngay
                         </div>
                     </div>
+
+                    <div class="tab-content" id="more-info">
+                        <h4>Thông tin bổ sung</h4>
+                        <div class="info-grid">
+                            ${formatInfoRow('Cách sử dụng', drug.usage_list || [drug.usage || 'Không có thông tin'])}
+                            ${formatInfoRow('Lưu ý', drug.caution_list || [drug.caution || 'Không có thông tin'])}
+                            ${formatInfoRow('Quy cách đóng gói', [drug.packing || 'Không có thông tin'])}
+                            ${formatInfoRow('Dạng bào chế', [drug.dosage_form || 'Không có thông tin'])}
+                            ${formatInfoRow('Nhà sản xuất', [drug.manufacturer || 'Không có thông tin'])}
+                            ${formatInfoRow('Nguồn dữ liệu', [drug.source || 'Không rõ nguồn'])}
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -510,6 +539,7 @@ function displayDrugDetail(drug, modal) {
         </div>
     `;
     
+    setupDrugImageCarousel(modal, drug.image_urls || drug.image_url);
     setupTabs(modal);
 }
 
@@ -550,6 +580,32 @@ function formatListItems(items) {
         const cleanItem = item.replace(/^[•\-\*]\s*/, '').trim();
         return `<li>${cleanItem}</li>`;
     }).join('');
+}
+
+function formatInfoRow(label, values) {
+    const normalizedValues = Array.isArray(values) ? values : [values];
+    const hasValid = normalizedValues.some(item => {
+        if (item === null || item === undefined) return false;
+        const text = String(item).trim().toLowerCase();
+        return text && text !== 'nan';
+    });
+
+    const finalValues = hasValid
+        ? normalizedValues.filter(item => {
+            if (item === null || item === undefined) return false;
+            const text = String(item).trim().toLowerCase();
+            return text && text !== 'nan';
+        })
+        : ['Không có thông tin'];
+
+    return `
+        <div class="info-row">
+            <h5>${label}</h5>
+            <ul class="detail-list">
+                ${formatListItems(finalValues.map(item => String(item)))}
+            </ul>
+        </div>
+    `;
 }
 
 function getCategoryClass(category) {

@@ -24,15 +24,15 @@
                     <div class="header-stats">
                         <div class="stat-item">
                             <i class="fas fa-pills"></i>
-                            <span>5,000+ Thuốc</span>
+                            <span>{{ home_stats.total_drugs_text }} Thuốc</span>
                         </div>
                         <div class="stat-item">
-                            <i class="fas fa-user-md"></i>
-                            <span>1,000+ Bác sĩ tin dùng</span>
+                            <i class="fas fa-database"></i>
+                            <span>{{ home_stats.source_count_text }} Nguồn dữ liệu</span>
                         </div>
                         <div class="stat-item">
                             <i class="fas fa-chart-line"></i>
-                            <span>62% Độ chính xác</span>
+                            <span>Xếp hạng semantic</span>
                         </div>
                     </div>
                 </div>
@@ -42,7 +42,7 @@
                 <div class="feature-item">
                     <i class="fas fa-brain"></i>
                     <h3>AI Thông minh</h3>
-                    <p>Sử dụng Machine Learning để phân tích triệu chứng và đưa ra gợi ý thuốc chính xác</p>
+                    <p>Sử dụng Deep Learning để phân tích triệu chứng và đưa ra gợi ý thuốc chính xác</p>
                 </div>
                 <div class="feature-item">
                     <i class="fas fa-shield-alt"></i>
@@ -66,16 +66,16 @@
     <!-- Search Section -->
     <div class="search-section">
         <div class="search-title">
-            <h2><i class="fas fa-search-plus"></i> Tìm kiếm thuốc theo triệu chứng</h2>
-            <p>Nhập các triệu chứng của bệnh nhân để nhận được gợi ý thuốc phù hợp từ hệ thống AI</p>
+            <h2><i class="fas fa-search-plus"></i> Phân tích triệu chứng để gợi ý thuốc</h2>
+            <p>Nhập triệu chứng hoặc mô tả tình trạng của bệnh nhân để hệ thống gợi ý thuốc phù hợp</p>
         </div>
         
         <div class="search-box">
             <input type="text" 
                    id="symptomsInput" 
-                   placeholder="Nhập triệu chứng bệnh nhân (VD: đau đầu, sốt cao, ho khan, đau bụng...)"
+                   placeholder="Ví dụ: đau đầu, sốt cao, ho khan, đau bụng..."
                    autocomplete="off"
-                   aria-label="Nhập triệu chứng bệnh nhân">
+                   aria-label="Nhập triệu chứng hoặc mô tả tình trạng bệnh nhân">
             <button id="searchBtn" aria-label="Tìm kiếm thuốc">
                 <i class="fas fa-search"></i> 
                 <span>Phân tích</span>
@@ -150,17 +150,17 @@
                         <i class="fas fa-database"></i>
                     </div>
                     <div class="stat-content">
-                        <h4><a href="{{ url_for('all_drugs') }}" style="color: inherit; text-decoration: none;">5,000+</a></h4>
+                        <h4><a href="{{ url_for('all_drugs') }}" style="color: inherit; text-decoration: none;">{{ home_stats.total_drugs_text }}</a></h4>
                         <p>Thuốc trong cơ sở dữ liệu</p>
                     </div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon">
-                        <i class="fas fa-search"></i>
+                        <i class="fas fa-database"></i>
                     </div>
                     <div class="stat-content">
-                        <h4>100,000+</h4>
-                        <p>Lượt tìm kiếm mỗi tháng</p>
+                        <h4>{{ home_stats.source_count_text }}</h4>
+                        <p>Nguồn dữ liệu tổng hợp</p>
                     </div>
                 </div>
                 <div class="stat-card">
@@ -168,8 +168,8 @@
                         <i class="fas fa-check-circle"></i>
                     </div>
                     <div class="stat-content">
-                        <h4>62%</h4>
-                        <p>Độ chính xác dự đoán</p>
+                        <h4>Semantic</h4>
+                        <p>Xếp hạng theo độ tương đồng</p>
                     </div>
                 </div>
                 <div class="stat-card">
