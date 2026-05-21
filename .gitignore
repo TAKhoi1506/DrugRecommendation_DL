@@ -1,4 +1,5 @@
-
+.gitignore
+.gitattributes
 venv/
 env/
 .venv/
@@ -46,19 +47,6 @@ crawlData_MinhChau/*_recrawled.csv
 crawlData_Pharmacity/*_demo*.csv
 crawlData_Pharmacity/*_error*.csv
 crawlData_Pharmacity/*_checkpoint.csv
-
-
-# Large artifacts (cannot push reliably to normal GitHub repo)
-Modeling/*.pth
-Modeling/*.pt
-Modeling/*.bin
-Web/cache/*.pt
-Web/cache/*.pth
-
-# Very large generated datasets
-preprocessData_All/merged_drug_data*.csv
-crawlData_MinhChau/minhchau_medicines_data*.csv
-preprocessData_MinhChau/minhchau_medicines_data*.csv
 
 
 

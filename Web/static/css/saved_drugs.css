@@ -14,6 +14,30 @@
     text-align: center;
 }
 
+/* Filters area styling for saved list */
+.saved-filters form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.saved-filters input[type="text"], .saved-filters select {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.saved-filters .btn {
+    padding: 8px 12px;
+    border-radius: 8px;
+}
+
+@media (max-width: 768px) {
+    .saved-filters form { flex-direction: column; align-items: stretch; }
+    .saved-filters .btn { width: 100%; }
+}
+
 .saved-stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

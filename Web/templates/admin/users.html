@@ -1,0 +1,125 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Quản lý người dùng - Admin{% endblock %}
+
+{% block content %}
+<div style="max-width: 1280px; margin: 100px auto 40px; padding: 20px;">
+    <div style="background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); color: white; padding: 25px; border-radius: 12px; margin-bottom: 25px;">
+        <h1><i class="fas fa-users-cog"></i> Quản lý người dùng</h1>
+        <p>Xem danh sách, phân quyền và xóa tài khoản người dùng</p>
+    </div>
+
+    <div class="alerts">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}" data-alert-type="{{ category }}" data-message="{{ message|e }}">
+                        <i class="fas fa-{{ 'check-circle' if category == 'success' else 'exclamation-triangle' }}"></i>
+                        <span>{{ message }}</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px;">
+        <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.08);">
+            <div style="color: #6c757d;">Tổng user</div>
+            <div style="font-size: 28px; font-weight: 700;">{{ total_users }}</div>
+        </div>
+        <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.08);">
+            <div style="color: #6c757d;">Admin</div>
+            <div style="font-size: 28px; font-weight: 700; color: #d35400;">{{ admin_count }}</div>
+        </div>
+        <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.08);">
+            <div style="color: #6c757d;">User thường</div>
+            <div style="font-size: 28px; font-weight: 700; color: #2980b9;">{{ regular_count }}</div>
+        </div>
+    </div>
+
+    <div style="background: white; border-radius: 12px; padding: 18px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.08);">
+        <form method="GET" action="{{ url_for('admin_users') }}" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+            <input type="text" name="search" value="{{ search }}" placeholder="Tìm theo username / họ tên" style="flex: 1; min-width: 240px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px;">
+            <select name="role" style="padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; min-width: 160px;">
+                <option value="">-- Tất cả role --</option>
+                <option value="user" {% if selected_role == 'user' %}selected{% endif %}>User</option>
+                <option value="admin" {% if selected_role == 'admin' %}selected{% endif %}>Admin</option>
+            </select>
+            <button type="submit" style="padding: 10px 16px; background: #3498db; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                <i class="fas fa-search"></i> Lọc
+            </button>
+            <a href="{{ url_for('admin_users') }}" style="padding: 10px 16px; background: #6c757d; color: white; border-radius: 8px; text-decoration: none;">
+                <i class="fas fa-redo"></i> Bỏ lọc
+            </a>
+            <a href="{{ url_for('admin_dashboard') }}" style="margin-left: auto; padding: 10px 16px; background: #27ae60; color: white; border-radius: 8px; text-decoration: none;">
+                <i class="fas fa-arrow-left"></i> Về dashboard
+            </a>
+        </form>
+    </div>
+
+    <div style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.08);">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead style="background: #f8f9fa;">
+                <tr>
+                    <th style="padding: 14px; text-align: left;">ID</th>
+                    <th style="padding: 14px; text-align: left;">Username</th>
+                    <th style="padding: 14px; text-align: left;">Họ tên</th>
+                    <th style="padding: 14px; text-align: left;">Role</th>
+                    <th style="padding: 14px; text-align: center;">Tra cứu</th>
+                    <th style="padding: 14px; text-align: center;">Đã lưu</th>
+                    <th style="padding: 14px; text-align: center;">Ngày tạo</th>
+                    <th style="padding: 14px; text-align: center;">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if users %}
+                    {% for item in users %}
+                    <tr style="border-top: 1px solid #eee;">
+                        <td style="padding: 14px;">{{ item.id }}</td>
+                        <td style="padding: 14px; font-weight: 600;">{{ item.username }}</td>
+                        <td style="padding: 14px;">{{ item.full_name }}</td>
+                        <td style="padding: 14px;">
+                            <span style="display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; background: {% if item.role == 'admin' %}#ffe5d0{% else %}#dfefff{% endif %}; color: {% if item.role == 'admin' %}#c55a11{% else %}#1f6fb2{% endif %};">
+                                {{ item.role }}
+                            </span>
+                        </td>
+                        <td style="padding: 14px; text-align: center;">{{ item.search_count }}</td>
+                        <td style="padding: 14px; text-align: center;">{{ item.saved_count }}</td>
+                        <td style="padding: 14px; text-align: center;">{{ item.created_at }}</td>
+                        <td style="padding: 14px; text-align: center;">
+                            <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                                {% if item.username == 'admin' %}
+                                <span style="color: #c0392b; font-size: 12px; font-weight: 600;">Tài khoản hệ thống</span>
+                                {% elif item.id != user.user_id %}
+                                <form method="POST" action="{{ url_for('admin_update_user_role', user_id=item.id) }}" style="display: inline-flex; gap: 6px; align-items: center;">
+                                    <select name="role" style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px;">
+                                        <option value="user" {% if item.role == 'user' %}selected{% endif %}>user</option>
+                                        <option value="admin" {% if item.role == 'admin' %}selected{% endif %}>admin</option>
+                                    </select>
+                                    <button type="submit" style="padding: 6px 10px; border: none; border-radius: 6px; background: #f39c12; color: white; cursor: pointer;">
+                                        <i class="fas fa-user-shield"></i> Cập nhật
+                                    </button>
+                                </form>
+
+                                <form method="POST" action="{{ url_for('admin_delete_user', user_id=item.id) }}" onsubmit="return confirm('Xóa người dùng này?');" style="display: inline;">
+                                    <button type="submit" style="padding: 6px 10px; border: none; border-radius: 6px; background: #e74c3c; color: white; cursor: pointer;">
+                                        <i class="fas fa-trash"></i> Xóa
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span style="color: #6c757d; font-size: 12px;">Tài khoản hiện tại</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="8" style="padding: 24px; text-align: center; color: #6c757d;">Không có người dùng nào phù hợp.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

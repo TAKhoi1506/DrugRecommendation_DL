@@ -31,16 +31,30 @@
     <!-- Actions -->
     <div style="display: flex; justify-content: space-between; margin-bottom: 25px; gap: 15px; flex-wrap: wrap;">
         
-        <!-- Search -->
-        <div style="display: flex; gap: 10px; flex: 1; max-width: 400px;">
+        <!-- Search + Filters -->
+        <div style="display: flex; gap: 10px; flex: 1; max-width: 900px; align-items: center; flex-wrap: wrap;">
             <input type="text" 
                    id="searchInput" 
+                   name="search"
                    placeholder="Tìm kiếm thuốc..." 
                    value="{{ search }}"
-                   style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 6px;"
+                   style="flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 6px; min-width:200px"
                    onkeypress="if(event.key==='Enter') searchDrugs()">
+            <select id="categoryFilter" name="category" style="padding:8px;border-radius:6px;border:1px solid #e6e6e6;">
+                <option value="">-- Tất cả danh mục --</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if cat == selected_category %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <select id="sourceFilter" name="source" style="padding:8px;border-radius:6px;border:1px solid #e6e6e6;">
+                <option value="">-- Nguồn --</option>
+                {% for s in sources %}
+                <option value="{{ s }}" {% if s == selected_source %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+            <input id="manufacturerInput" name="manufacturer" type="text" placeholder="Nhà sản xuất" value="{{ selected_manufacturer }}" style="padding:8px;border-radius:6px;border:1px solid #e6e6e6;min-width:160px">
             <button onclick="searchDrugs()" style="padding: 10px 15px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                <i class="fas fa-search"></i> Tìm
+                <i class="fas fa-search"></i> Áp dụng
             </button>
         </div>
         
@@ -111,8 +125,14 @@
                                 <i class="fas fa-eye"></i>
                             </button>
                             
-                            <!-- Chỉ cho phép xóa thuốc thêm thủ công -->
+                            <!-- Chỉ cho phép sửa và xóa thuốc thêm thủ công -->
                             {% if drug.source == 'manual' %}
+                            <a href="{{ url_for('edit_drug', drug_id=drug.id) }}"
+                               style="display: inline-block; padding: 4px 8px; background: #ffc107; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; text-decoration: none;"
+                               title="Chỉnh sửa">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            
                             <form method="POST" 
                                   action="{{ url_for('delete_drug_route', drug_id=drug.id) }}" 
                                   style="display: inline;" 
@@ -125,7 +145,7 @@
                                 </button>
                             </form>
                             {% else %}
-                            <span style="color: #6c757d; font-size: 11px;" title="Không thể xóa thuốc từ dataset">
+                            <span style="color: #6c757d; font-size: 11px;" title="Không thể sửa/xóa thuốc từ dataset">
                                 <i class="fas fa-lock"></i>
                             </span>
                             {% endif %}
@@ -150,7 +170,7 @@
     </div>
 
      <!-- Stats -->
-     <div style="text-align: center; margin-top: 25px; color: #6c757d;">
+    <div style="text-align: center; margin-top: 25px; color: #6c757d;">
         <p>
             <strong>Hiển thị:</strong> {{ drugs|length }} trên {{ pagination.total }} thuốc
             (Trang {{ pagination.page }}/{{ pagination.total_pages }})
@@ -248,13 +268,16 @@
     function searchDrugs() {
         const searchTerm = document.getElementById('searchInput').value;
         const url = new URL(window.location);
-        
-        if (searchTerm.trim()) {
-            url.searchParams.set('search', searchTerm);
-        } else {
-            url.searchParams.delete('search');
-        }
-        
+        const category = document.getElementById('categoryFilter') ? document.getElementById('categoryFilter').value : '';
+        const source = document.getElementById('sourceFilter') ? document.getElementById('sourceFilter').value : '';
+        const manufacturer = document.getElementById('manufacturerInput') ? document.getElementById('manufacturerInput').value : '';
+
+        if (searchTerm.trim()) url.searchParams.set('search', searchTerm); else url.searchParams.delete('search');
+        if (category) url.searchParams.set('category', category); else url.searchParams.delete('category');
+        if (source) url.searchParams.set('source', source); else url.searchParams.delete('source');
+        if (manufacturer.trim()) url.searchParams.set('manufacturer', manufacturer); else url.searchParams.delete('manufacturer');
+
+        url.searchParams.delete('page');
         window.location.href = url.toString();
     }
     

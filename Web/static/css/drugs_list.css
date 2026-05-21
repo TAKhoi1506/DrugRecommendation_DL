@@ -20,6 +20,69 @@
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
+/* Filters layout */
+.filters-form {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.filters-row {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    margin-top: 14px;
+    flex-wrap: wrap;
+}
+
+.filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 160px;
+}
+
+.filter-field label {
+    font-size: 13px;
+    color: #495057;
+    font-weight: 600;
+}
+
+.filter-field input[type="text"], .filter-field select {
+    padding: 8px 10px;
+    border: 1px solid #e3e6ea;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 14px;
+}
+
+.filter-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
+}
+
+.filter-actions .btn {
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    min-width: 108px;
+    height: 36px;
+    justify-content: center;
+}
+
+@media (max-width: 900px) {
+    .filters-row { gap: 10px; }
+    .filter-field { min-width: 140px; flex: 1 1 45%; }
+    .filter-actions { width: 100%; justify-content: flex-start; }
+}
+
+@media (max-width: 480px) {
+    .filters-row { flex-direction: column; align-items: stretch; }
+    .filter-field { width: 100%; }
+    .filter-actions { margin-left: 0; justify-content: flex-start; }
+}
+
 .search-box {
     display: flex;
     gap: 10px;

@@ -262,10 +262,16 @@
                 </div>
 
                 <div class="form-group half-width">
-                    <label for="drug_class"><i class="fas fa-tags"></i> Phân loại</label>
-                    <input type="text" id="drug_class" name="drug_class" class="form-control"
-                           value="{{ drug.drug_class if drug else '' }}"
-                           placeholder="VD: Giảm đau hạ sốt" data-field="drug_class">
+                    <label for="drug_class"><i class="fas fa-tags"></i> Phân loại *</label>
+                    <div style="display: flex; gap: 5px; align-items: flex-end;">
+                        <select id="drug_class" name="drug_class" class="form-control" required data-field="drug_class" 
+                                data-current-value="{{ drug.drug_class if drug else '' }}" style="flex: 1;">
+                            <option value="">-- Chọn danh mục --</option>
+                        </select>
+                        <button type="button" id="addNewCategoryBtn" class="btn btn-success" style="padding: 8px 10px; margin-bottom: 0;">
+                            <i class="fas fa-plus"></i> Mới
+                        </button>
+                    </div>
                 </div>
 
                 <div class="form-group half-width">
@@ -392,6 +398,74 @@
 <script>
 // Form validation và interaction
 document.addEventListener('DOMContentLoaded', function() {
+    // ========== Load categories vào dropdown ==========
+    const drugClassSelect = document.getElementById('drug_class');
+    const currentCategory = drugClassSelect.getAttribute('data-current-value');
+    
+    fetch('/get_categories')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.categories && data.categories.length > 0) {
+                // Clear existing options except placeholder
+                const placeholder = drugClassSelect.querySelector('option[value=""]');
+                drugClassSelect.innerHTML = '';
+                if (placeholder) {
+                    drugClassSelect.appendChild(placeholder);
+                }
+                
+                // Add categories as options
+                data.categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    option.textContent = category;
+                    drugClassSelect.appendChild(option);
+                });
+                
+                // Pre-select category if in edit mode
+                if (currentCategory && currentCategory !== '') {
+                    drugClassSelect.value = currentCategory;
+                }
+            } else {
+                console.error('Failed to load categories:', data.error || 'Unknown error');
+                showAlert('Không thể tải danh sách danh mục. Vui lòng F5 tải lại trang.', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching categories:', error);
+            showAlert('Lỗi khi tải danh sách danh mục: ' + error.message, 'error');
+        });
+    
+    // ========== Add New Category Button Handler ==========
+    const addNewCategoryBtn = document.getElementById('addNewCategoryBtn');
+    if (addNewCategoryBtn) {
+        addNewCategoryBtn.addEventListener('click', function() {
+            const newCategory = prompt('Nhập tên danh mục mới:');
+            if (newCategory && newCategory.trim()) {
+                const categoryName = newCategory.trim();
+                
+                // Check if category already exists
+                const existingOption = Array.from(drugClassSelect.options).find(
+                    opt => opt.value === categoryName
+                );
+                
+                if (existingOption) {
+                    showAlert('Danh mục này đã tồn tại', 'warning');
+                    drugClassSelect.value = categoryName;
+                } else {
+                    // Add new category to dropdown
+                    const newOption = document.createElement('option');
+                    newOption.value = categoryName;
+                    newOption.textContent = categoryName;
+                    drugClassSelect.appendChild(newOption);
+                    
+                    // Select the new category
+                    drugClassSelect.value = categoryName;
+                    showAlert('Đã thêm danh mục mới: ' + categoryName, 'success');
+                }
+            }
+        });
+    }
+    
     // Auto-dismiss alerts after 5 seconds
     const alerts = document.querySelectorAll('.alert');
     alerts.forEach(alert => {
@@ -411,10 +485,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     form.addEventListener('submit', function(e) {
         const drugName = document.querySelector('[data-field="drug_name"]').value.trim();
+        const drugClass = document.querySelector('[data-field="drug_class"]').value.trim();
         
         if (!drugName) {
             e.preventDefault();
             showAlert('Vui lòng nhập tên thuốc', 'error');
+            return;
+        }
+        
+        // Validate drug_class is selected
+        if (!drugClass) {
+            e.preventDefault();
+            showAlert('Vui lòng chọn danh mục thuốc', 'error');
             return;
         }
         

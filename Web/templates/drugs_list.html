@@ -20,7 +20,7 @@
 
     <!-- Search Section -->
     <div class="search-section">
-        <form method="GET">
+        <form method="GET" class="filters-form">
             <div class="search-box">
                 <input type="text" 
                        name="search" 
@@ -30,6 +30,41 @@
                 <button type="submit" class="search-btn">
                     <i class="fas fa-search"></i> Tìm kiếm
                 </button>
+            </div>
+
+            <div class="filters-row">
+                <div class="filter-field">
+                    <label>Danh mục</label>
+                    <select name="category">
+                        <option value="">-- Tất cả --</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}" {% if cat == selected_category %}selected{% endif %}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-field">
+                    <label>Nhà sản xuất</label>
+                    <input type="text" name="manufacturer" placeholder="Nhà sản xuất" value="{{ selected_manufacturer }}">
+                </div>
+
+                <div class="filter-field">
+                    <label>Dạng</label>
+                    <input type="text" name="dosage_form" placeholder="Viên / Siro / Kem" value="{{ selected_dosage_form }}">
+                </div>
+
+                <div class="filter-field">
+                    <label>Giá (VNĐ)</label>
+                    <div style="display:flex;gap:6px">
+                        <input type="text" name="min_price" placeholder="Từ" value="{{ selected_min_price }}" style="width:90px">
+                        <input type="text" name="max_price" placeholder="Đến" value="{{ selected_max_price }}" style="width:90px">
+                    </div>
+                </div>
+
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">Áp dụng</button>
+                    <a href="{{ url_for('all_drugs') }}" class="btn btn-secondary">Xóa bộ lọc</a>
+                </div>
             </div>
         </form>
         

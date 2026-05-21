@@ -14,6 +14,21 @@
         <p>Danh sách các thuốc bạn đã lưu từ kết quả tìm kiếm</p>
     </div>
 
+    <!-- Filters for saved list -->
+    <div class="saved-filters" style="margin-top:12px;">
+        <form method="GET" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <input type="text" name="search" placeholder="Tìm trong thuốc đã lưu..." value="{{ saved_search or '' }}" style="padding:6px 8px;">
+            <select name="category" style="padding:6px 8px;">
+                <option value="">-- Tất cả danh mục --</option>
+                {% for cat in saved_categories %}
+                <option value="{{ cat }}" {% if cat == selected_saved_category %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-primary" type="submit">Lọc</button>
+            <a href="{{ url_for('saved_drugs_page') }}" class="btn btn-secondary">Xóa bộ lọc</a>
+        </form>
+    </div>
+
     <!-- Stats -->
     <div class="saved-stats">
         <div class="stat-card">

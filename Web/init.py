@@ -69,29 +69,7 @@ def init_database():
         )
     ''')
 
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS chat_sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            title TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-    ''')
 
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS chat_messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id INTEGER NOT NULL,
-            role TEXT NOT NULL,
-            content TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (session_id) REFERENCES chat_sessions (id)
-        )
-    ''')
-
-    # Backward-compatible migration
     try:
         columns = [row[1] for row in cursor.execute("PRAGMA table_info(saved_drugs)").fetchall()]
         if 'score' not in columns:
@@ -429,6 +407,74 @@ def get_user_profile(user_id):
         return dict(user)
     return None
 
+
+def get_all_users(search_term=None, role=None):
+    """Lấy danh sách users kèm thống kê cơ bản"""
+    conn = get_db()
+    query = '''
+        SELECT
+            u.id,
+            u.username,
+            u.full_name,
+            u.role,
+            u.created_at,
+            COALESCE((SELECT COUNT(*) FROM search_logs sl WHERE sl.user_id = u.id), 0) AS search_count,
+            COALESCE((SELECT COUNT(*) FROM saved_drugs sd WHERE sd.user_id = u.id), 0) AS saved_count
+        FROM users u
+        WHERE 1=1
+    '''
+    params = []
+
+    if search_term:
+        query += ' AND (u.username LIKE ? OR u.full_name LIKE ?)'
+        like_term = f'%{search_term}%'
+        params.extend([like_term, like_term])
+
+    if role:
+        query += ' AND u.role = ?'
+        params.append(role)
+
+    query += ' ORDER BY u.created_at DESC, u.id DESC'
+
+    users = conn.execute(query, params).fetchall()
+    conn.close()
+    return [dict(user) for user in users]
+
+
+def update_user_role(user_id, new_role):
+    """Cập nhật role của user"""
+    if new_role not in ('user', 'admin'):
+        raise ValueError('Role không hợp lệ')
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE users SET role = ? WHERE id = ?', (new_role, user_id))
+    conn.commit()
+    updated_rows = cursor.rowcount
+    conn.close()
+    return updated_rows > 0
+
+
+def delete_user_account(user_id):
+    """Xóa user và dữ liệu liên quan"""
+    conn = get_db()
+    cursor = conn.cursor()
+
+    existing_user = conn.execute('SELECT id FROM users WHERE id = ?', (user_id,)).fetchone()
+    if not existing_user:
+        conn.close()
+        return False
+
+    cursor.execute('DELETE FROM search_favorites WHERE user_id = ?', (user_id,))
+    cursor.execute('DELETE FROM saved_drugs WHERE user_id = ?', (user_id,))
+    cursor.execute('DELETE FROM search_logs WHERE user_id = ?', (user_id,))
+    cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+
+    deleted_rows = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return deleted_rows > 0
+
 def update_user_profile(user_id, full_name):
     """Cập nhật thông tin profile của user"""
     conn = get_db()
@@ -606,6 +652,64 @@ def add_drug(
     conn.close()
     return drug_id
 
+def update_drug(
+    drug_id,
+    drug_name,
+    drug_class,
+    ingredients,
+    indication,
+    dosage_form=None,
+    packing=None,
+    usage=None,
+    caution=None,
+    contraindication=None,
+    side_effects=None,
+    manufacturer=None,
+    price=None,
+    image_urls=None,
+):
+    """Cập nhật thuốc thủ công"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        UPDATE drugs_master SET
+            drug_name = ?,
+            drug_class = ?,
+            ingredients = ?,
+            indication = ?,
+            dosage_form = ?,
+            packing = ?,
+            usage = ?,
+            caution = ?,
+            contraindication = ?,
+            side_effects = ?,
+            manufacturer = ?,
+            price = ?,
+            image_urls = ?
+        WHERE id = ?
+    ''', (
+        drug_name,
+        drug_class,
+        ingredients,
+        indication,
+        dosage_form,
+        packing,
+        usage,
+        caution,
+        contraindication,
+        side_effects,
+        manufacturer,
+        price,
+        json.dumps(image_urls or [], ensure_ascii=False),
+        drug_id,
+    ))
+    
+    updated_rows = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return updated_rows > 0
+
 def delete_drug(drug_id):
     """Xóa thuốc"""
     conn = get_db()
@@ -618,85 +722,7 @@ def delete_drug(drug_id):
     return deleted_rows > 0
 
 
-def create_chat_session(user_id=None, title=None):
-    """Tạo phiên chat mới"""
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO chat_sessions (user_id, title)
-        VALUES (?, ?)
-    ''', (user_id, title))
-    session_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return session_id
 
-
-def touch_chat_session(session_id):
-    """Cập nhật thời gian hoạt động phiên chat"""
-    conn = get_db()
-    conn.execute('''
-        UPDATE chat_sessions
-        SET updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-    ''', (session_id,))
-    conn.commit()
-    conn.close()
-
-
-def add_chat_message(session_id, role, content):
-    """Thêm tin nhắn vào phiên chat"""
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO chat_messages (session_id, role, content)
-        VALUES (?, ?, ?)
-    ''', (session_id, role, content))
-    message_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-
-    touch_chat_session(session_id)
-    return message_id
-
-
-def get_chat_messages(session_id, user_id=None, limit=100):
-    """Lấy tin nhắn theo phiên chat (có kiểm tra quyền sở hữu nếu user_id được truyền)"""
-    conn = get_db()
-
-    if user_id is not None:
-        session_row = conn.execute('''
-            SELECT id FROM chat_sessions
-            WHERE id = ? AND (user_id = ? OR user_id IS NULL)
-        ''', (session_id, user_id)).fetchone()
-        if not session_row:
-            conn.close()
-            return []
-
-    messages = conn.execute('''
-        SELECT id, session_id, role, content, created_at
-        FROM chat_messages
-        WHERE session_id = ?
-        ORDER BY created_at ASC
-        LIMIT ?
-    ''', (session_id, limit)).fetchall()
-    conn.close()
-
-    return [dict(m) for m in messages]
-
-
-def get_user_chat_sessions(user_id, limit=30):
-    """Lấy danh sách phiên chat của user"""
-    conn = get_db()
-    sessions = conn.execute('''
-        SELECT id, user_id, title, created_at, updated_at
-        FROM chat_sessions
-        WHERE user_id = ?
-        ORDER BY updated_at DESC
-        LIMIT ?
-    ''', (user_id, limit)).fetchall()
-    conn.close()
-    return [dict(s) for s in sessions]
 
 # Khởi tạo khi import
 if __name__ == "__main__":

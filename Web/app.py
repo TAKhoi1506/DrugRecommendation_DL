@@ -17,7 +17,8 @@ from init import (
     get_search_statistics, get_user_profile, init_database, create_user, 
     log_search_enhanced, track_drug_click, update_user_profile, verify_user, 
     get_stats, save_drug, get_saved_drugs, remove_saved_drug, is_drug_saved,
-    get_all_drugs, add_drug as add_drug_to_master, delete_drug,
+    get_all_drugs, get_all_users, add_drug as add_drug_to_master, delete_drug,
+    update_drug as update_drug_to_master, update_user_role, delete_user_account,
 )
 from functools import wraps
 from datetime import timedelta
@@ -476,11 +477,11 @@ class EnhancedDrugRecommendationEngine:
         # Debug thông tin dataset
         if self.data_final is not None:
             print(f"Dataset info:")
-            print(f"   Columns: {self.data_final.columns.tolist()}")
-            print(f"   Shape: {self.data_final.shape}")
-            print(f"   Name column: {self.name_col}")
-            print(f"   Inference max_length: {self.max_length}")
-    
+            print(f"- Columns: {self.data_final.columns.tolist()}")
+            print(f"- Shape: {self.data_final.shape}")
+            print(f"- Name column: {self.name_col}")
+            print(f"- Inference max_length: {self.max_length}")
+
     def _create_symptom_mapping(self):
         return {
             'đau đầu': ['đau đầu', 'nhức đầu', 'migraine', 'đau nửa đầu', 'headache'],
@@ -803,11 +804,9 @@ class EnhancedDrugRecommendationEngine:
         if not text or text == 'Không có thông tin':
             return ['Không có thông tin']
         
-        # Split by common delimiters
         items = re.split(r'[.;,\n]', text)
         items = [item.strip() for item in items if item.strip()]
         
-        # Remove duplicates and empty items
         seen = set()
         result = []
         for item in items:
@@ -887,7 +886,7 @@ def to_json_safe(obj):
     return obj
 
 
-# Decorators
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -908,7 +907,7 @@ def admin_required(f):
     return decorated_function
 
 
-# Khởi tạo DB + migrations
+# Khởi tạo DB 
 init_database()
 
 # Khởi tạo engine
@@ -989,6 +988,8 @@ def logout():
 @admin_required
 def admin_dashboard():
     stats = get_stats()
+    # Thêm số lượng thuốc có danh mục không hợp lệ
+    stats['invalid_drugs_count'] = _get_invalid_drugs_count()
     return render_template('admin/admin_index.html', 
                          user=session, 
                          stats=stats)
@@ -1245,6 +1246,73 @@ def debug():
     stats = engine.get_dataset_stats()
     return jsonify(stats)
 
+def _get_valid_categories():
+    """Helper: Lấy danh sách categories hợp lệ từ dataset + master"""
+    categories = set()
+    
+    # Từ dataset
+    if engine.data_final is not None and engine.category_col and engine.category_col in engine.data_final.columns:
+        dataset_cats = engine.data_final[engine.category_col].dropna().unique()
+        for cat in dataset_cats:
+            if pd.notna(cat) and str(cat).strip() and str(cat).strip().lower() != 'nan':
+                categories.add(str(cat).strip())
+    
+    # Từ drugs_master
+    try:
+        conn = get_db()
+        master_cats = conn.execute('SELECT DISTINCT drug_class FROM drugs_master WHERE drug_class IS NOT NULL AND drug_class != ""').fetchall()
+        for row in master_cats:
+            if row['drug_class'] and str(row['drug_class']).strip():
+                categories.add(str(row['drug_class']).strip())
+        conn.close()
+    except:
+        pass
+    
+    return sorted(list(categories))
+
+
+def _get_dataset_categories():
+    """Helper: Lấy danh sách categories chỉ từ dataset chính thức"""
+    categories = set()
+
+    if engine.data_final is not None and engine.category_col and engine.category_col in engine.data_final.columns:
+        dataset_cats = engine.data_final[engine.category_col].dropna().unique()
+        for cat in dataset_cats:
+            if pd.notna(cat):
+                category_text = str(cat).strip()
+                if category_text and category_text.lower() != 'nan':
+                    categories.add(category_text)
+
+    return sorted(list(categories))
+
+def _get_invalid_drugs_count():
+    """Helper: Lấy số lượng thuốc có danh mục không hợp lệ"""
+    try:
+        valid_categories = _get_valid_categories()
+        conn = get_db()
+        all_drugs = conn.execute('SELECT drug_class FROM drugs_master').fetchall()
+        conn.close()
+        
+        invalid_count = 0
+        for drug in all_drugs:
+            drug_class = drug['drug_class'] or ''
+            if drug_class and drug_class not in valid_categories:
+                invalid_count += 1
+        
+        return invalid_count
+    except:
+        return 0
+
+
+@app.route('/get_categories')
+def get_categories():
+    """Lấy danh sách categories hợp lệ từ dataset + master"""
+    try:
+        categories_list = _get_valid_categories()
+        return jsonify({'categories': categories_list, 'success': True})
+    except Exception as e:
+        return jsonify({'categories': [], 'success': False, 'error': str(e)})
+
 @app.route('/save_drug', methods=['POST'])
 @login_required
 def save_drug_route():
@@ -1324,6 +1392,20 @@ def saved_drugs_page():
                 print(f"Exception getting drug info: {e}")  # Debug log
                 pass  # Giữ thông tin cơ bản nếu không lấy được chi tiết
         
+        # Filters for saved list
+        saved_search = request.args.get('search', '')
+        saved_category = request.args.get('category', '')
+
+        # Lọc saved_drugs theo search / category nếu có
+        if saved_search:
+            saved_drugs = [d for d in saved_drugs if saved_search.lower() in (str(d.get('drug_name','')).lower() or '')]
+
+        if saved_category:
+            saved_drugs = [d for d in saved_drugs if saved_category.lower() in (str(d.get('drug_class','')).lower() or '')]
+
+        # Build categories for saved list filter
+        saved_categories = sorted(list({str(d.get('drug_class','')).strip() for d in get_saved_drugs(user_id) if d.get('drug_class')}))
+
         user = {
             'user_id': session['user_id'],
             'username': session['username'],
@@ -1334,7 +1416,10 @@ def saved_drugs_page():
         print(f"Rendering template with {len(saved_drugs)} drugs")  # Debug log
         return render_template('saved_drugs.html', 
                              saved_drugs=saved_drugs, 
-                             user=user)
+                             user=user,
+                             saved_categories=saved_categories,
+                             selected_saved_category=saved_category,
+                             saved_search=saved_search)
                              
     except Exception as e:
         print(f"Error in saved_drugs_page: {e}")  # Debug log
@@ -1451,7 +1536,14 @@ def change_password_route():
 def all_drugs():
     try:
         drugs = []
+        categories = []
         search = request.args.get('search', '')
+        # Basic filters
+        category = request.args.get('category', '')
+        manufacturer = request.args.get('manufacturer', '')
+        dosage_form = request.args.get('dosage_form', '')
+        min_price = request.args.get('min_price', '')
+        max_price = request.args.get('max_price', '')
         
         if engine.data_final is not None:
             df = engine.data_final
@@ -1470,7 +1562,36 @@ def all_drugs():
                 filtered_df = df[mask]
             else:
                 filtered_df = df
-            
+            # Áp dụng các bộ lọc cơ bản
+            if category:
+                if engine.category_col and engine.category_col in df.columns:
+                    filtered_df = filtered_df[
+                        filtered_df[engine.category_col].astype(str).str.strip().str.lower() == category.strip().lower()
+                    ]
+
+            if manufacturer:
+                if engine.manufacturer_col and engine.manufacturer_col in df.columns:
+                    filtered_df = filtered_df[filtered_df[engine.manufacturer_col].astype(str).str.contains(manufacturer, case=False, na=False)]
+
+            if dosage_form:
+                if engine.dosage_form_col and engine.dosage_form_col in df.columns:
+                    filtered_df = filtered_df[filtered_df[engine.dosage_form_col].astype(str).str.contains(dosage_form, case=False, na=False)]
+
+            try:
+                if min_price:
+                    minp = float(re.sub(r'[^0-9\.]', '', min_price))
+                    if engine.price_col and engine.price_col in df.columns:
+                        filtered_df = filtered_df[pd.to_numeric(filtered_df[engine.price_col], errors='coerce') >= minp]
+
+                if max_price:
+                    maxp = float(re.sub(r'[^0-9\.]', '', max_price))
+                    if engine.price_col and engine.price_col in df.columns:
+                        filtered_df = filtered_df[pd.to_numeric(filtered_df[engine.price_col], errors='coerce') <= maxp]
+            except Exception:
+                pass
+
+            # Build list of available categories for the filter UI
+            categories = _get_dataset_categories()
 
             # Phân trang
             start_idx = (page - 1) * per_page
@@ -1527,10 +1648,16 @@ def all_drugs():
             }
         
         return render_template('drugs_list.html', 
-                             drugs=drugs,
-                             search=search,
-                             pagination=pagination_info,
-                             user=user)
+                     drugs=drugs,
+                     search=search,
+                     pagination=pagination_info,
+                     user=user,
+                     categories=categories,
+                     selected_category=category,
+                     selected_manufacturer=manufacturer,
+                     selected_dosage_form=dosage_form,
+                     selected_min_price=min_price,
+                     selected_max_price=max_price)
                              
     except Exception as e:
         print(f"Error in all_drugs: {e}")
@@ -1547,16 +1674,38 @@ def admin_drugs():
         search = request.args.get('search', '')
         page = int(request.args.get('page', 1))
         per_page = 20  # Số thuốc mỗi trang
-        
-        # Lấy tất cả thuốc
+
+        # additional admin filters
+        selected_category = request.args.get('category', '')
+        selected_source = request.args.get('source', '')
+        selected_manufacturer = request.args.get('manufacturer', '')
+
+        # Lấy tất cả thuốc (dataset + manual)
         all_drugs = get_all_drugs(search if search else None, 'both')
-        
-        # Phân trang
-        total_drugs = len(all_drugs)
+
+        # Build filter lists for UI
+        categories = _get_dataset_categories()
+        sources = ['dataset', 'manual']
+        manufacturers = sorted(list({(d.get('manufacturer') or '').strip() for d in all_drugs if d.get('manufacturer')}))
+
+        # Áp dụng bộ lọc admin trên danh sách thu được
+        filtered = all_drugs
+        if selected_category:
+            filtered = [
+                d for d in filtered
+                if str(d.get('drug_class', '')).strip().lower() == selected_category.strip().lower()
+            ]
+        if selected_source:
+            filtered = [d for d in filtered if selected_source.lower() == str(d.get('source','')).lower()]
+        if selected_manufacturer:
+            filtered = [d for d in filtered if selected_manufacturer.lower() in (str(d.get('manufacturer','')).lower())]
+
+        # Phân trang trên danh sách đã lọc
+        total_drugs = len(filtered)
         total_pages = math.ceil(total_drugs / per_page) if total_drugs > 0 else 1
         start_idx = (page - 1) * per_page
         end_idx = start_idx + per_page
-        drugs = all_drugs[start_idx:end_idx]
+        drugs = filtered[start_idx:end_idx]
         
         pagination = {
             'page': page,
@@ -1570,15 +1719,123 @@ def admin_drugs():
         }
         
         return render_template('admin/drug_management.html',
-                             drugs=drugs,
-                             search=search,
-                             pagination=pagination,
-                             user=session)
+                     drugs=drugs,
+                     search=search,
+                     pagination=pagination,
+                     user=session,
+                     categories=categories,
+                     selected_category=selected_category,
+                     sources=sources,
+                     selected_source=selected_source,
+                     manufacturers=manufacturers,
+                     selected_manufacturer=selected_manufacturer)
                              
     except Exception as e:
         print(f"Error in admin_drugs: {e}")
         flash(f'Lỗi tải danh sách thuốc: {str(e)}', 'error')
         return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/users')
+@admin_required
+def admin_users():
+    try:
+        search = request.args.get('search', '').strip()
+        role = request.args.get('role', '').strip()
+
+        users = get_all_users(search_term=search or None, role=role or None)
+
+        admin_count = sum(1 for user in users if user.get('role') == 'admin')
+        regular_count = sum(1 for user in users if user.get('role') == 'user')
+
+        return render_template(
+            'admin/users.html',
+            user=session,
+            users=users,
+            search=search,
+            selected_role=role,
+            total_users=len(users),
+            admin_count=admin_count,
+            regular_count=regular_count,
+        )
+    except Exception as e:
+        print(f"Error in admin_users: {e}")
+        flash(f'Lỗi tải danh sách người dùng: {str(e)}', 'error')
+        return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/users/<int:user_id>/role', methods=['POST'])
+@admin_required
+def admin_update_user_role(user_id):
+    try:
+        new_role = request.form.get('role', '').strip()
+        current_user_id = session.get('user_id')
+
+        conn = get_db()
+        target_user = conn.execute('SELECT id, username, role FROM users WHERE id = ?', (user_id,)).fetchone()
+        conn.close()
+
+        if not target_user:
+            flash('Không tìm thấy người dùng để cập nhật', 'error')
+            return redirect(url_for('admin_users'))
+
+        if user_id == current_user_id:
+            flash('Bạn không thể thay đổi role của chính mình tại đây', 'error')
+            return redirect(url_for('admin_users'))
+
+        if target_user['username'] == 'admin':
+            flash('Không thể thay đổi role của tài khoản admin mặc định', 'error')
+            return redirect(url_for('admin_users'))
+
+        if new_role not in ('user', 'admin'):
+            flash('Role không hợp lệ', 'error')
+            return redirect(url_for('admin_users'))
+
+        if update_user_role(user_id, new_role):
+            flash('Đã cập nhật role người dùng', 'success')
+        else:
+            flash('Không tìm thấy người dùng để cập nhật', 'error')
+    except Exception as e:
+        flash(f'Lỗi cập nhật role: {str(e)}', 'error')
+
+    return redirect(url_for('admin_users'))
+
+
+@app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_user(user_id):
+    try:
+        current_user_id = session.get('user_id')
+        current_role = session.get('role')
+
+        if user_id == current_user_id:
+            flash('Không thể xóa chính tài khoản đang đăng nhập', 'error')
+            return redirect(url_for('admin_users'))
+
+        conn = get_db()
+        target_user = conn.execute('SELECT id, role, username FROM users WHERE id = ?', (user_id,)).fetchone()
+        conn.close()
+
+        if not target_user:
+            flash('Không tìm thấy người dùng để xóa', 'error')
+            return redirect(url_for('admin_users'))
+
+        if target_user['username'] == 'admin':
+            flash('Không thể xóa tài khoản admin mặc định', 'error')
+            return redirect(url_for('admin_users'))
+
+        if target_user['role'] == 'admin' and current_role != 'admin':
+            flash('Bạn không có quyền xóa tài khoản admin khác', 'error')
+            return redirect(url_for('admin_users'))
+
+        if delete_user_account(user_id):
+            flash('Đã xóa người dùng thành công', 'success')
+        else:
+            flash('Không thể xóa người dùng', 'error')
+    except Exception as e:
+        flash(f'Lỗi xóa người dùng: {str(e)}', 'error')
+
+    return redirect(url_for('admin_users'))
 
 @app.route('/admin/drug/add', methods=['GET', 'POST'], endpoint='add_drug')
 @admin_required
@@ -1653,6 +1910,16 @@ def add_drug_route():
                 flash('Tên thuốc không được để trống', 'error')
                 return render_template('admin/drug_form.html', mode='add', user=session)
             
+            # Validate drug_class is in approved categories
+            if not drug_class:
+                flash('Vui lòng chọn danh mục thuốc', 'error')
+                return render_template('admin/drug_form.html', mode='add', user=session)
+            
+            valid_categories = _get_valid_categories()
+            if drug_class not in valid_categories:
+                flash(f'Danh mục "{drug_class}" không hợp lệ. Vui lòng chọn một danh mục từ danh sách.', 'error')
+                return render_template('admin/drug_form.html', mode='add', user=session)
+            
             drug_id = add_drug_to_master(
                 drug_name,
                 drug_class,
@@ -1676,6 +1943,164 @@ def add_drug_route():
     
     return render_template('admin/drug_form.html', mode='add', user=session)
 
+@app.route('/admin/drug/edit/<int:drug_id>', methods=['GET', 'POST'], endpoint='edit_drug')
+@admin_required
+def edit_drug_route(drug_id):
+    """Chỉnh sửa thuốc thủ công"""
+    if request.method == 'GET':
+        # Lấy thông tin thuốc cần edit
+        try:
+            conn = get_db()
+            drug = conn.execute('''
+                SELECT id, drug_name, drug_class, ingredients, indication,
+                       dosage_form, packing, usage, caution,
+                       contraindication, side_effects, manufacturer, price, image_urls
+                FROM drugs_master
+                WHERE id = ?
+            ''', (drug_id,)).fetchone()
+            conn.close()
+            
+            if not drug:
+                flash('Không tìm thấy thuốc để chỉnh sửa', 'error')
+                return redirect(url_for('admin_drugs'))
+            
+            # Parse image_urls from JSON
+            image_urls = []
+            if drug['image_urls']:
+                try:
+                    image_urls = json.loads(drug['image_urls'])
+                except:
+                    pass
+            
+            drug_dict = {
+                'id': drug['id'],
+                'drug_name': drug['drug_name'],
+                'drug_class': drug['drug_class'],
+                'ingredients': drug['ingredients'],
+                'indication': drug['indication'],
+                'dosage_form': drug['dosage_form'],
+                'packing': drug['packing'],
+                'usage': drug['usage'],
+                'caution': drug['caution'],
+                'contraindication': drug['contraindication'],
+                'side_effects': drug['side_effects'],
+                'manufacturer': drug['manufacturer'],
+                'price': drug['price'],
+                'image_urls': image_urls
+            }
+            
+            return render_template('admin/drug_form.html', mode='edit', drug=drug_dict, user=session)
+            
+        except Exception as e:
+            flash(f'Lỗi tải thông tin thuốc: {str(e)}', 'error')
+            return redirect(url_for('admin_drugs'))
+    
+    elif request.method == 'POST':
+        try:
+            drug_name = request.form.get('drug_name', '').strip()
+            drug_class = request.form.get('drug_class', '').strip()
+            ingredients = request.form.get('ingredients', '').strip()
+            indication = request.form.get('indication', '').strip()
+            dosage_form = request.form.get('dosage_form', '').strip() or None
+            packing = request.form.get('packing', '').strip() or None
+            usage = request.form.get('usage', '').strip() or None
+            caution = request.form.get('caution', '').strip() or None
+            contraindication = request.form.get('contraindication', '').strip() or None
+            side_effects = request.form.get('side_effects', '').strip() or None
+            manufacturer = request.form.get('manufacturer', '').strip() or None
+            price_raw = request.form.get('price', '').strip()
+            price = None
+
+            image_urls = []
+            for i in range(1, 6):
+                image_value = request.form.get(f'image_url_{i}', '').strip()
+                if not image_value:
+                    continue
+
+                if not re.match(r'^https?://', image_value, flags=re.IGNORECASE):
+                    flash(f'URL ảnh #{i} không hợp lệ. Vui lòng nhập link bắt đầu bằng http:// hoặc https://', 'error')
+                    return redirect(url_for('edit_drug', drug_id=drug_id))
+
+                image_urls.append(image_value)
+
+            # Nhận thêm ảnh upload từ máy
+            uploaded_image_urls = []
+            upload_files = request.files.getlist('image_files')
+            upload_files = [f for f in upload_files if f and str(getattr(f, 'filename', '')).strip()]
+
+            if upload_files:
+                upload_dir = os.path.join(app.static_folder, 'uploads', 'drugs')
+                os.makedirs(upload_dir, exist_ok=True)
+
+                for upload_file in upload_files:
+                    if not _allowed_image_file(upload_file.filename):
+                        flash('Chỉ hỗ trợ ảnh định dạng JPG, JPEG, PNG, WEBP', 'error')
+                        return redirect(url_for('edit_drug', drug_id=drug_id))
+
+                    safe_name = secure_filename(upload_file.filename)
+                    extension = os.path.splitext(safe_name)[1].lower()
+                    unique_name = f"{uuid.uuid4().hex}{extension}"
+                    output_path = os.path.join(upload_dir, unique_name)
+                    upload_file.save(output_path)
+
+                    static_rel = f"uploads/drugs/{unique_name}".replace('\\', '/')
+                    uploaded_image_urls.append(url_for('static', filename=static_rel))
+
+            # Ưu tiên ảnh upload trước, sau đó ảnh URL
+            merged_image_urls = list(dict.fromkeys(uploaded_image_urls + image_urls))
+            if len(merged_image_urls) > 5:
+                flash('Chỉ được tối đa 5 ảnh (gồm cả URL và ảnh tải từ máy)', 'error')
+                return redirect(url_for('edit_drug', drug_id=drug_id))
+
+            if price_raw:
+                try:
+                    price_digits = re.sub(r'[^0-9]', '', price_raw)
+                    price = float(price_digits) if price_digits else None
+                except ValueError:
+                    flash('Giá tiền không hợp lệ', 'error')
+                    return redirect(url_for('edit_drug', drug_id=drug_id))
+            
+            if not drug_name:
+                flash('Tên thuốc không được để trống', 'error')
+                return redirect(url_for('edit_drug', drug_id=drug_id))
+            
+            # Validate drug_class is in approved categories
+            if not drug_class:
+                flash('Vui lòng chọn danh mục thuốc', 'error')
+                return redirect(url_for('edit_drug', drug_id=drug_id))
+            
+            valid_categories = _get_valid_categories()
+            if drug_class not in valid_categories:
+                flash(f'Danh mục "{drug_class}" không hợp lệ. Vui lòng chọn một danh mục từ danh sách.', 'error')
+                return redirect(url_for('edit_drug', drug_id=drug_id))
+            
+            # Update drug
+            if update_drug_to_master(
+                drug_id,
+                drug_name,
+                drug_class,
+                ingredients,
+                indication,
+                dosage_form=dosage_form,
+                packing=packing,
+                usage=usage,
+                caution=caution,
+                contraindication=contraindication,
+                side_effects=side_effects,
+                manufacturer=manufacturer,
+                price=price,
+                image_urls=merged_image_urls,
+            ):
+                flash(f'Đã cập nhật thuốc thành công (ID: {drug_id})', 'success')
+                return redirect(url_for('admin_drugs'))
+            else:
+                flash('Không tìm thấy thuốc để cập nhật', 'error')
+                return redirect(url_for('admin_drugs'))
+            
+        except Exception as e:
+            flash(f'Lỗi cập nhật thuốc: {str(e)}', 'error')
+            return redirect(url_for('edit_drug', drug_id=drug_id))
+
 @app.route('/admin/drug/delete/<int:drug_id>', methods=['POST'])
 @admin_required
 def delete_drug_route(drug_id):
@@ -1689,6 +2114,7 @@ def delete_drug_route(drug_id):
         flash(f'Lỗi xóa thuốc: {str(e)}', 'error')
     
     return redirect(url_for('admin_drugs'))
+
 
 
 @app.route('/admin/stats')
