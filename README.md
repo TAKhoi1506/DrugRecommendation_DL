@@ -25,7 +25,71 @@ Hệ thống gợi ý thuốc tiếng Việt dựa trên triệu chứng, kết 
 3. **Modeling**: fine-tune PhoBERT và xây dựng vector biểu diễn thuốc.
 4. **Web app**: triển khai giao diện Flask để người dùng tra cứu và quản trị.
 
+## Ảnh demo
+1. **Giao diện trang chủ**
+<img width="1894" height="1005" alt="image" src="https://github.com/user-attachments/assets/9e479cdc-e9bd-448b-87ce-9edce05a2717" />
+
+
+
+2. **Giao diện khi thực hiện phân tích**
+<img width="1891" height="1007" alt="image" src="https://github.com/user-attachments/assets/b2ef5039-e0bf-4689-ba36-44edebe7ad27" />
+
+
+
+3. **Giao diện khi xem chi tiết thông tin thuốc**
+<img width="680" height="917" alt="image" src="https://github.com/user-attachments/assets/ec1bbe6c-1e06-4beb-82f6-d048b3c1fb81" />
+
+
+
+## Kết quả thực nghiệm
+
+### So sánh mô hình gợi ý
+
+Kết quả dưới đây được trích từ notebook huấn luyện/đánh giá trong `Modeling/Modeling_Finetune_PhoBERT_final.ipynb`.
+
+| Mô hình | Hit@1 | Hit@3 | Hit@5 | MRR@5 | Precision@5 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| TF-IDF | 0.467 | 0.592 | 0.623 | 0.533 | 0.493 |
+| BiLSTM | 0.824 | 0.882 | 0.882 | 0.843 | 0.800 |
+| BiGRU | 0.765 | 0.941 | 0.941 | 0.843 | 0.776 |
+| TextCNN | 0.765 | 0.824 | 0.824 | 0.794 | 0.800 |
+| TF-IDF + SVD | 0.824 | 0.941 | 0.941 | 0.873 | 0.788 |
+| PhoBERT | 0.824 | 0.882 | 0.882 | 0.853 | 0.812 |
+
+### Log huấn luyện PhoBERT
+
+| Epoch | Train loss | Val loss | Best val |
+| --- | ---: | ---: | ---: |
+| 1 | 3.1840 | 2.6387 | 2.6387 |
+| 2 | 2.5637 | 2.5072 | 2.5072 |
+| 3 | 2.4595 | 2.4560 | 2.4560 |
+| 4 | 2.3734 | 2.4781 | 2.4560 |
+| 5 | 2.3208 | 2.4341 | 2.4341 |
+| 6 | 2.2716 | 2.4558 | 2.4341 |
+| 7 | 2.2328 | 2.4659 | 2.4341 |
+| 8 | 2.2095 | 2.4746 | 2.4341 |
+
 ## Cấu trúc thư mục
+
+| Thư mục / tệp | Vai trò | Nội dung chính |
+| --- | --- | --- |
+| `crawlData_AnKhang/` | Crawl dữ liệu An Khang | Notebook crawl link và crawl chi tiết thuốc, file CSV dữ liệu thô và file lỗi/fix. |
+| `crawlData_DieuTri/` | Crawl dữ liệu Điều Trị | Notebook lấy link, crawl dữ liệu và thư mục chứa link danh mục. |
+| `crawlData_LongChau/` | Crawl dữ liệu Long Châu | Notebook crawl danh mục/thuốc, file JSON và CSV dữ liệu thô. |
+| `crawlData_MinhChau/` | Crawl dữ liệu Minh Châu | Notebook crawl link và dữ liệu thuốc, các file CSV trung gian và đã làm sạch. |
+| `crawlData_Pharmacity/` | Crawl dữ liệu Pharmacity | Notebook crawl link/thuốc và các file CSV lỗi, demo, dữ liệu cuối. |
+| `preprocessData_All/` | Hợp nhất và chuẩn hoá dữ liệu | Notebook EDA, mapping danh mục, merge dữ liệu và file CSV hợp nhất cuối cùng. |
+| `preprocessData_AnKhang/` | Tiền xử lý riêng An Khang | Dữ liệu đã làm sạch/chuẩn hoá cho nguồn An Khang. |
+| `preprocessData_DieuTri/` | Tiền xử lý riêng Điều Trị | Dữ liệu đã chuẩn hoá cho nguồn Điều Trị. |
+| `preprocessData_LongChau/` | Tiền xử lý riêng Long Châu | Dữ liệu đã chuẩn hoá cho nguồn Long Châu. |
+| `preprocessData_MinhChau/` | Tiền xử lý riêng Minh Châu | Dữ liệu đã chuẩn hoá cho nguồn Minh Châu. |
+| `preprocessData_Pharmacity/` | Tiền xử lý riêng Pharmacity | Dữ liệu đã chuẩn hoá cho nguồn Pharmacity. |
+| `Modeling/` | Huấn luyện mô hình | Notebook fine-tune PhoBERT và các file model `.pth` đã lưu. |
+| `Web/` | Ứng dụng Flask | Mã nguồn web, database SQLite, templates, static assets và logic gợi ý thuốc. |
+| `requirements.txt` | Phụ thuộc Python | Danh sách thư viện cần cài đặt để chạy pipeline và web app. |
+| `README.md` | Tài liệu dự án | Hướng dẫn tổng quan, cài đặt, chạy và mô tả các thành phần. |
+
+### Cấu trúc tổng quan
 
 ```text
 DrugRecommandation/
@@ -158,3 +222,10 @@ Hoặc theo cấu hình mặc định của app:
 - Đây là dự án phục vụ nghiên cứu/đồ án, nên dữ liệu và model có thể cần cập nhật lại nếu thay đổi nguồn crawl hoặc cấu trúc cột.
 - Nếu bạn muốn chạy trên máy khác, hãy kiểm tra lại đúng đường dẫn dataset và model trong phần biến môi trường.
 - Có thể bổ sung ảnh demo giao diện vào README để trang GitHub trực quan hơn.
+
+## Tác giả
+
+- Dự án: DrugRecommandation
+- Mô tả: Hệ thống gợi ý thuốc tiếng Việt dựa trên triệu chứng
+
+
